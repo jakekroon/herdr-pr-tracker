@@ -1,0 +1,42 @@
+# herdr-pr-tracker — configuration.
+#
+#   cp config.example config
+#
+# `config` is gitignored: it is yours, and this file is what ships. Two
+# locations are read — this one (the repo root, handy while the plugin is linked
+# live) and then the plugin config dir, which is read second and so wins:
+#
+#   herdr plugin config-dir herdr-pr-tracker
+#
+# Everything is commented out at its default. The pane reads its config once at
+# startup, so toggle the widget off and on after editing.
+#
+# Glyphs, colours, signal precedence and sort order are deliberately NOT
+# configurable. A widget whose meaning depends on settings is a widget you have
+# to remember the settings of before you can read it.
+
+# Seconds between GitHub polls. The query costs 3 points of the 5000/hour
+# GraphQL budget regardless of how many PRs come back, so 60s uses about 180 an
+# hour: the limit here is your attention, not the API.
+#POLL_SECONDS=60
+
+# The GitHub search. This is the one knob that changes *what* is tracked — for
+# example swap in `review-requested:@me` to watch other people's PRs instead.
+# `archived:false` keeps unmergeable PRs in archived repos out.
+#SEARCH_QUERY="is:pr is:open author:@me archived:false"
+
+# Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
+# beyond this are counted in the "+N older" row rather than silently dropped.
+#MAX_PRS=100
+
+# auto | always | never. `auto` shows the owner only when a PR's owner differs
+# from the one most of your PRs share, so the common case stays compact.
+#SHOW_OWNER=auto
+
+# Set to 0/off to render without colour, leaving the glyphs to carry the state.
+#COLOR=on
+
+# Minimum seconds between sidebar-token lookups for a single pane. Focus events
+# fire far more often than a PR's state changes, and each lookup is two `gh`
+# subprocesses.
+#TOKEN_THROTTLE_SECONDS=30

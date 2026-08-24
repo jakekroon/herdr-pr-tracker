@@ -1,0 +1,12 @@
+# Your config, not the shipped example.
+config
+
+node_modules/
+*.log
+
+# Architecture decision records, kept local.
+docs/adr
+
+# Working notes, kept local: the probed Herdr API facts and the domain language.
+CLAUDE.md
+CONTEXT.md

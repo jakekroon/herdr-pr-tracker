@@ -1,0 +1,62 @@
+id = "herdr-pr-tracker"
+name = "PR Tracker"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "Every open pull request you have authored, docked and colour-coded by what needs you."
+platforms = ["macos", "linux"]
+
+# Commands are run directly, not through a shell, so bun is invoked explicitly
+# rather than relying on a shebang plus the execute bit.
+
+[[panes]]
+id = "prs"
+title = "prs"
+placement = "split"
+command = ["bun", "bin/pane.ts"]
+description = "Open PRs you authored, with status"
+
+# Restore the widget after a session restore.
+[[startup]]
+command = ["bun", "bin/follow.ts"]
+
+# The widget follows you: Herdr has no always-on-top surface, so these hooks
+# relocate the single widget pane into whichever tab you enter.
+[[events]]
+on = "tab.focused"
+command = ["bun", "bin/follow.ts"]
+
+[[events]]
+on = "workspace.focused"
+command = ["bun", "bin/follow.ts"]
+
+# The sidebar `$pr` token for the focused pane's branch. This is the
+# responsibility inherited from the gh-pr plugin this one replaces; without it,
+# `$pr` in the user's sidebar row config goes blank.
+#
+# Deliberately not hooked to pane.output_changed, which fires on every output
+# burst and would be a hook storm; bin/token.ts throttles per pane on top.
+[[events]]
+on = "pane.focused"
+command = ["bun", "bin/token.ts"]
+
+[[events]]
+on = "worktree.opened"
+command = ["bun", "bin/token.ts"]
+
+[[events]]
+on = "worktree.created"
+command = ["bun", "bin/token.ts"]
+
+[[actions]]
+id = "refresh"
+title = "Refresh PR status"
+description = "Fetch the PR list now instead of waiting for the next poll"
+contexts = ["global"]
+command = ["bun", "bin/refresh.ts"]
+
+[[actions]]
+id = "toggle"
+title = "Toggle the PR pane"
+description = "Show or hide the PR list widget"
+contexts = ["global"]
+command = ["bun", "bin/toggle.ts"]

@@ -1,0 +1,764 @@
+{
+  "data": {
+    "search": {
+      "issueCount": 12,
+      "nodes": [
+        {
+          "number": 412,
+          "title": "Move the nightly import behind a queue and record what it skippe",
+          "url": "https://github.com/acme/metrics-service/pull/412",
+          "isDraft": true,
+          "createdAt": "2026-08-24T14:19:21Z",
+          "headRefName": "TICKET-100",
+          "reviewDecision": null,
+          "repository": {
+            "name": "metrics-service",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 208,
+          "title": "Split the settings page into tabs and keep the deep links wor",
+          "url": "https://github.com/acme/metrics-service/pull/208",
+          "isDraft": true,
+          "createdAt": "2026-08-24T13:42:06Z",
+          "headRefName": "TICKET-101",
+          "reviewDecision": null,
+          "repository": {
+            "name": "metrics-service",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 3,
+            "nodes": [
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 10432,
+          "title": "Retire the legacy export path now that every caller has been mig",
+          "url": "https://github.com/acme/web-app/pull/10432",
+          "isDraft": false,
+          "createdAt": "2026-08-24T11:36:40Z",
+          "headRefName": "TICKET-102",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "isResolved": true
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 2874,
+          "title": "Cache the lookup table once per request rather than once per row",
+          "url": "https://github.com/acme/web-app/pull/2874",
+          "isDraft": false,
+          "createdAt": "2026-08-24T10:48:44Z",
+          "headRefName": "TICKET-103",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 631,
+          "title": "Add a retry with backoff around the third-party ad",
+          "url": "https://github.com/acme/web-app/pull/631",
+          "isDraft": false,
+          "createdAt": "2026-08-24T10:41:44Z",
+          "headRefName": "TICKET-104",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 197,
+          "title": "Tidy the seed data so a fresh checkout boots with",
+          "url": "https://github.com/acme/metrics-service/pull/197",
+          "isDraft": false,
+          "createdAt": "2026-08-24T09:14:40Z",
+          "headRefName": "TICKET-105",
+          "reviewDecision": null,
+          "repository": {
+            "name": "metrics-service",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 15098,
+          "title": "Batch the notification writes and drop the duplicate suppression",
+          "url": "https://github.com/acme/web-app/pull/15098",
+          "isDraft": false,
+          "createdAt": "2026-08-24T03:01:52Z",
+          "headRefName": "TICKET-106",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 4417,
+          "title": "Give the importer a dry-run mode and log the diff it would apply",
+          "url": "https://github.com/acme/web-app/pull/4417",
+          "isDraft": false,
+          "createdAt": "2026-08-20T07:02:55Z",
+          "headRefName": "TICKET-107",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 928,
+          "title": "Return a stable sort order from the collection endpoint in every",
+          "url": "https://github.com/acme/web-app/pull/928",
+          "isDraft": false,
+          "createdAt": "2026-08-20T07:02:52Z",
+          "headRefName": "TICKET-108",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 7233,
+          "title": "Roll the feature flag into the default path and delete the branc",
+          "url": "https://github.com/acme/web-app/pull/7233",
+          "isDraft": false,
+          "createdAt": "2026-08-20T07:02:29Z",
+          "headRefName": "TICKET-109",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "isResolved": true
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 12760,
+          "title": "Trim the payload to the fields the client actually reads on load",
+          "url": "https://github.com/acme/web-app/pull/12760",
+          "isDraft": false,
+          "createdAt": "2026-08-20T07:02:26Z",
+          "headRefName": "TICKET-110",
+          "reviewDecision": null,
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 1526,
+          "title": "Make the background job idempotent so a redelivery is not a bu",
+          "url": "https://github.com/acme/platform-infra-tools/pull/1526",
+          "isDraft": false,
+          "createdAt": "2026-07-16T07:27:29Z",
+          "headRefName": "add_metrics",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "repository": {
+            "name": "platform-infra-tools",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 9,
+            "nodes": [
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "cost": 3,
+      "remaining": 4977
+    }
+  }
+}

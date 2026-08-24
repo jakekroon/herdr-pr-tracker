@@ -1,0 +1,180 @@
+# herdr-pr-tracker
+
+A [Herdr](https://herdr.dev) plugin that keeps a list of **every open pull
+request you have authored**, across every repository you can see, docked on the
+right of whatever tab you are looking at.
+
+It answers one question: *what is the state of everything I have open?* — and it
+only tracks. It never opens, closes, merges or comments on anything.
+
+```
+   5 open · 2 need you · 12s ago
+platform-infra-tools ───────────────────────
+   add_metrics                       ◆ ⚑4  ✓
+    #1526 Make the background job idemp… 39d
+
+web-app ────────────────────────────────────
+   TICKET-101-4-permissions                ✓
+    #12760 Trim the payload to the field… 4d
+▪  TICKET-101-7-tests                  ⚑1  ✓
+    #4417 Give the importer a dry-run mo… 4d
+
+metrics-service ────────────────────────────
+▪◌ TICKET-104                              ✓
+    #208 Split the settings page into ta… 2h
+ ◌ TICKET-105                              ✓
+    #412 Move the nightly import behind … 1h
+```
+
+One summary line, then a band per repository, then one pull request per pair of
+lines: the branch and its status first, the number, title and the pull request's
+own age second. **The title is a hyperlink** — click it and the pull request
+opens in your browser.
+
+## What each mark means
+
+| Mark | Meaning | Colour |
+|---|---|---|
+| `✗` in the review column | Changes requested | red |
+| `✗` in the check column | Checks failing | red |
+| `⚑N` | `N` unresolved review threads | yellow |
+| `◆` | A review is required and has not been given | magenta |
+| `●` | Checks still running | blue |
+| `✓` in the review column | Approved | green |
+| `✓` in the check column | Checks passing | green |
+| `◌` | Draft — dims the whole row | dim |
+| **bold** branch | Changes requested, failing checks or unresolved threads — the three that are yours to act on | — |
+| `▪` | A Herdr workspace is open on this branch | dim |
+| *nothing* | Ready for review, nothing to do | plain |
+
+A pull request can carry several of these at once, so each is drawn separately —
+nothing is hidden by something louder. The row's own colour is the loudest one it
+carries, in this order: changes requested, failing checks, unresolved threads,
+review required, checks running, approved, clean.
+
+Some deliberate choices worth knowing:
+
+- **A clean pull request is uncoloured.** If every row is coloured, the colour
+  tells you nothing.
+- **Emphasis is a second axis, not a seventh colour.** The palette is your Herdr
+  theme's own sixteen and does not grow, so the three signals that are *your*
+  work — changes requested, failing checks, unresolved threads — take bold as
+  well as colour. They are also what the header counts as needing you.
+- **A cancelled check is not a failure.** A cancelled run is nearly always one
+  you superseded, and colouring it red teaches you to ignore red.
+- **Checks still running are blue, not green.** "CI is still thinking" is the
+  most common state of a fresh pull request, and showing it as passing is
+  misleading.
+- **A draft is dimmed, not greyed out.** A draft with failing checks still shows
+  the failure, in dim red.
+- **Every unresolved thread counts** — including ones you have already replied
+  to. The widget reports what GitHub reports rather than guessing whose turn it
+  is, so a thread the reviewer has not resolved keeps its row yellow.
+- `▪` is the one thing GitHub's own pull request list cannot tell you: which of
+  these you actually have checked out right now.
+
+Ordering is **oldest first**, by creation date, and it never changes as statuses
+change — rows do not jump around while you glance at them. Drafts stay in date
+position.
+
+If the list is taller than the pane, the rows are **halved before any of them is
+dropped**: the title line goes and its hyperlink moves onto the branch, so a
+squeezed pane still shows every pull request, its signals and its link. Only when
+even that overflows are rows dropped, and then the *oldest* go, with a `… +N
+older` row at the top — your newest work is never what falls off the end.
+
+## The sidebar token
+
+The plugin also labels the focused agent pane's sidebar row with that pane's
+branch's pull request — `#21288 ✓`, or `◌#21288 ✓` for a draft. Add `$pr` to your
+agent row to see it:
+
+```toml
+[ui.sidebar.agents]
+rows = [["state_icon", "workspace", "tab", "$pr"], ["agent"]]
+```
+
+This replaces the `gh-pr` plugin, which did the same thing.
+
+## Requirements
+
+- Herdr >= 0.8.0
+- `bun`, `git`, and `gh` on your `PATH`, with `gh auth status` clean
+
+## Install
+
+```bash
+herdr plugin link /path/to/herdr-pr-tracker
+```
+
+That is the whole install — no daemon and no config file needed.
+
+### Keybindings
+
+A plugin cannot ship its own keybinding. To reach the actions by keystroke, add
+them to `~/.config/herdr/config.toml` and run `herdr server reload-config`:
+
+```toml
+[[keys.command]]
+key = "prefix+p"
+type = "plugin_action"
+command = "herdr-pr-tracker.toggle"
+description = "toggle the PR pane"
+
+[[keys.command]]
+key = "prefix+i"
+type = "plugin_action"
+command = "herdr-pr-tracker.refresh"
+description = "refresh PR status"
+```
+
+Avoid `alt+` chords (they emit characters in the terminal), and pick keys that do
+not collide with the built-ins: `o`, `g`, `r`, `v` and `e` are taken.
+
+## Configuration
+
+Optional. `cp config.example config`, or drop a `config` in
+`herdr plugin config-dir herdr-pr-tracker` — the plugin config dir is read second
+and wins. Every setting is documented in `config.example`.
+
+The one worth knowing about is `SEARCH_QUERY`: it is the whole definition of what
+gets tracked, so pointing it at `is:pr is:open review-requested:@me` turns the
+widget into an inbox of other people's pull requests instead.
+
+Glyphs, colours, precedence and sort order are deliberately **not** configurable.
+A widget whose meaning depends on settings is a widget you have to remember the
+settings of before you can read it.
+
+## How it works
+
+One `gh api graphql` request per poll fetches every pull request and everything
+about it — 3 points of the 5000/hour budget regardless of how many come back, so
+the default 60-second poll costs about 180 an hour. Unresolved review threads are
+the reason it is GraphQL and not `gh pr list`: `isResolved` exists nowhere else.
+
+Herdr has no background-poll mechanism for plugins, so the poll loop lives in the
+pane process itself — the one part of a plugin allowed to stay alive. The pane
+follows you between tabs by being *moved* rather than reopened, so the list stays
+on screen through the trip.
+
+It never shows stale data as though it were fresh. The header carries the age of
+what is on screen; past two poll intervals it turns yellow, and a failed refresh
+turns it red and says why (`auth failed`, `offline`, `rate limited`) while still
+admitting how old the rows are. An empty list says `0 open` and `✓ all clear`, so
+"nothing to do" is never confusable with "the widget is broken".
+
+The pane takes no keyboard input and cannot be typed into or killed with a
+keystroke. It does **not** claim the mouse, because mouse events have to reach
+Herdr for the title hyperlinks to work.
+
+## Development
+
+```bash
+bun test        # 194 tests: no network, no gh, no Herdr
+bunx tsc --noEmit
+```
+
+The widget's whole design turns on one distinction: **draft is a modifier on
+open, not an alternative to it.** A draft is still open, still yours, and still
+needs you — it is just not asking anyone else for anything yet, so it is dimmed
+rather than dropped.

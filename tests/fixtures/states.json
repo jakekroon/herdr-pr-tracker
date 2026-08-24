@@ -1,0 +1,882 @@
+{
+  "data": {
+    "search": {
+      "issueCount": 14,
+      "nodes": [
+        {
+          "number": 100,
+          "title": "Approved and green",
+          "url": "https://github.com/acme/repo/pull/100",
+          "isDraft": false,
+          "createdAt": "2026-01-02T00:00:00Z",
+          "headRefName": "b100",
+          "reviewDecision": "APPROVED",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 101,
+          "title": "Changes requested and failing",
+          "url": "https://github.com/acme/repo/pull/101",
+          "isDraft": false,
+          "createdAt": "2026-01-03T00:00:00Z",
+          "headRefName": "b101",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 102,
+          "title": "Review required with three unresolved",
+          "url": "https://github.com/acme/repo/pull/102",
+          "isDraft": false,
+          "createdAt": "2026-01-04T00:00:00Z",
+          "headRefName": "b102",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 3,
+            "nodes": [
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 103,
+          "title": "CI still running",
+          "url": "https://github.com/acme/repo/pull/103",
+          "isDraft": false,
+          "createdAt": "2026-01-05T00:00:00Z",
+          "headRefName": "b103",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": null,
+                          "status": "IN_PROGRESS"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 104,
+          "title": "Only a cancelled run",
+          "url": "https://github.com/acme/repo/pull/104",
+          "isDraft": false,
+          "createdAt": "2026-01-06T00:00:00Z",
+          "headRefName": "b104",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "CANCELLED",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 105,
+          "title": "Skipped and neutral alongside a pass",
+          "url": "https://github.com/acme/repo/pull/105",
+          "isDraft": false,
+          "createdAt": "2026-01-07T00:00:00Z",
+          "headRefName": "b105",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SKIPPED",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "NEUTRAL",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 106,
+          "title": "Timed out",
+          "url": "https://github.com/acme/repo/pull/106",
+          "isDraft": false,
+          "createdAt": "2026-01-08T00:00:00Z",
+          "headRefName": "b106",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "TIMED_OUT",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 107,
+          "title": "Action required",
+          "url": "https://github.com/acme/repo/pull/107",
+          "isDraft": false,
+          "createdAt": "2026-01-09T00:00:00Z",
+          "headRefName": "b107",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "ACTION_REQUIRED",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 108,
+          "title": "Draft that is approved but failing",
+          "url": "https://github.com/acme/repo/pull/108",
+          "isDraft": true,
+          "createdAt": "2026-01-10T00:00:00Z",
+          "headRefName": "b108",
+          "reviewDecision": "APPROVED",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 109,
+          "title": "More unresolved threads than one page",
+          "url": "https://github.com/acme/repo/pull/109",
+          "isDraft": false,
+          "createdAt": "2026-01-11T00:00:00Z",
+          "headRefName": "b109",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 150,
+            "nodes": [
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 110,
+          "title": "No checks configured at all",
+          "url": "https://github.com/acme/repo/pull/110",
+          "isDraft": false,
+          "createdAt": "2026-01-12T00:00:00Z",
+          "headRefName": "b110",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 111,
+          "title": "Legacy status context pending",
+          "url": "https://github.com/acme/repo/pull/111",
+          "isDraft": false,
+          "createdAt": "2026-01-13T00:00:00Z",
+          "headRefName": "b111",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "StatusContext",
+                          "state": "PENDING"
+                        },
+                        {
+                          "__typename": "StatusContext",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 112,
+          "title": "All threads resolved",
+          "url": "https://github.com/acme/repo/pull/112",
+          "isDraft": false,
+          "createdAt": "2026-01-14T00:00:00Z",
+          "headRefName": "b112",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 4,
+            "nodes": [
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              },
+              {
+                "isResolved": true
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 113,
+          "title": "Long repo name for width tests",
+          "url": "https://github.com/acme/repo/pull/113",
+          "isDraft": false,
+          "createdAt": "2026-01-15T00:00:00Z",
+          "headRefName": "b113",
+          "reviewDecision": null,
+          "repository": {
+            "name": "another-repository-with-a-long-name",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "cost": 3,
+      "remaining": 4997
+    }
+  }
+}
