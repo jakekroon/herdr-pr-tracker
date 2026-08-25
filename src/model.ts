@@ -209,6 +209,10 @@ interface RawNode {
   createdAt?: string;
   headRefName?: string;
   reviewDecision?: string | null;
+  reviewRequests?: { totalCount?: number } | null;
+  latestOpinionatedReviews?: {
+    nodes?: Array<{ state?: string } | null> | null;
+  } | null;
   author?: { login?: string } | null;
   repository?: { name?: string; owner?: { login?: string } };
   reviewThreads?: {
@@ -232,6 +236,36 @@ const REVIEW_VALUES = new Set([
   "REVIEW_REQUIRED",
 ]);
 
+/**
+ * The review state, from `reviewDecision` where GitHub gives one and derived
+ * from the reviews themselves where it does not.
+ *
+ * GitHub populates `reviewDecision` only where a review is *required* by
+ * branch protection, so on an unprotected repository an approved pull request
+ * reports `null` — indistinguishable from nobody having looked. That is why
+ * nothing was ever green. `latestOpinionatedReviews` is one review per
+ * reviewer with `COMMENTED` already dropped, which is exactly the set GitHub
+ * itself reduces to a decision, so the fallback agrees with the field it
+ * stands in for rather than inventing a second opinion.
+ *
+ * The order is the same precedence GitHub uses: a request for changes
+ * outranks an approval, because it is the one that blocks. An approval then
+ * outranks an outstanding review request — without branch protection one
+ * approval is enough to merge, so a lingering request for a second reviewer
+ * must not hide the approval that already arrived.
+ */
+function reviewOf(n: RawNode): ReviewDecision {
+  const given = n.reviewDecision;
+  if (REVIEW_VALUES.has(given as string)) return given as ReviewDecision;
+
+  const states = (n.latestOpinionatedReviews?.nodes ?? [])
+    .map((r) => r?.state);
+  if (states.includes("CHANGES_REQUESTED")) return "CHANGES_REQUESTED";
+  if (states.includes("APPROVED")) return "APPROVED";
+  if ((n.reviewRequests?.totalCount ?? 0) > 0) return "REVIEW_REQUIRED";
+  return null;
+}
+
 /** One raw node to one row. Shared by both views so a field can never be read
  * one way in the authored view and another way in the inbound one. */
 function toRow(n: RawNode, threadCap: number): PrRow {
@@ -240,7 +274,6 @@ function toRow(n: RawNode, threadCap: number): PrRow {
   const total = n.reviewThreads?.totalCount ?? threads.length;
   const contexts =
     n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? [];
-  const review = n.reviewDecision ?? null;
 
   return {
     owner: n.repository?.owner?.login ?? "",
@@ -252,7 +285,7 @@ function toRow(n: RawNode, threadCap: number): PrRow {
     author: n.author?.login ?? "",
     isDraft: n.isDraft === true,
     createdAt: n.createdAt ?? "",
-    review: (REVIEW_VALUES.has(review as string) ? review : null) as ReviewDecision,
+    review: reviewOf(n),
     ci: rollupChecks(contexts ?? []),
     unresolved,
     // The thread page is capped, so a PR at the cap may have more unresolved

@@ -10,7 +10,18 @@
 
 /** The pull request selection, shared by both documents. One definition, so a
  * field cannot end up present in one view and missing in the other — which
- * would render as a row that is blank in the inbound view only. */
+ * would render as a row that is blank in the inbound view only.
+ *
+ * `reviewDecision` alone is not enough, and this is the trap: GitHub only
+ * populates it where a review is *required* by branch protection. Probed
+ * 2026-08-25 against this account — four open pull requests carrying an
+ * `APPROVED` review all reported `reviewDecision: null`, so the whole fleet
+ * rendered as `clean` and nothing was ever green. `latestOpinionatedReviews`
+ * is the answer: one review per reviewer, `COMMENTED` already excluded (which
+ * is the same review GitHub itself ignores when it computes the decision), so
+ * `reviewDecision` can be derived wherever GitHub declines to give one.
+ * `reviewRequests.totalCount` supplies the other half — a review asked for and
+ * not yet given, which is `REVIEW_REQUIRED` without branch protection. */
 const PR_FIELDS = `
       ... on PullRequest {
         number
@@ -20,6 +31,8 @@ const PR_FIELDS = `
         createdAt
         headRefName
         reviewDecision
+        reviewRequests(first: 1) { totalCount }
+        latestOpinionatedReviews(first: 20) { nodes { state } }
         author { login }
         repository { name owner { login } }
         reviewThreads(first: $threads) {

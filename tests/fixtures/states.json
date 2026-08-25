@@ -1,7 +1,7 @@
 {
   "data": {
     "search": {
-      "issueCount": 14,
+      "issueCount": 19,
       "nodes": [
         {
           "number": 100,
@@ -868,6 +868,245 @@
                     }
                   }
                 }
+              }
+            ]
+          }
+        },
+        {
+          "number": 114,
+          "title": "Approved but no branch protection",
+          "url": "https://github.com/acme/repo/pull/114",
+          "isDraft": false,
+          "createdAt": "2026-01-16T00:00:00Z",
+          "headRefName": "b114",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "reviewRequests": {
+            "totalCount": 0
+          },
+          "latestOpinionatedReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED"
+              }
+            ]
+          }
+        },
+        {
+          "number": 115,
+          "title": "Changes requested with no branch protection",
+          "url": "https://github.com/acme/repo/pull/115",
+          "isDraft": false,
+          "createdAt": "2026-01-17T00:00:00Z",
+          "headRefName": "b115",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "reviewRequests": {
+            "totalCount": 0
+          },
+          "latestOpinionatedReviews": {
+            "nodes": [
+              {
+                "state": "CHANGES_REQUESTED"
+              },
+              {
+                "state": "APPROVED"
+              }
+            ]
+          }
+        },
+        {
+          "number": 116,
+          "title": "Review requested and nobody has looked",
+          "url": "https://github.com/acme/repo/pull/116",
+          "isDraft": false,
+          "createdAt": "2026-01-18T00:00:00Z",
+          "headRefName": "b116",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "reviewRequests": {
+            "totalCount": 1
+          },
+          "latestOpinionatedReviews": {
+            "nodes": []
+          }
+        },
+        {
+          "number": 117,
+          "title": "Approved with a second reviewer still requested",
+          "url": "https://github.com/acme/repo/pull/117",
+          "isDraft": false,
+          "createdAt": "2026-01-19T00:00:00Z",
+          "headRefName": "b117",
+          "reviewDecision": null,
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "reviewRequests": {
+            "totalCount": 1
+          },
+          "latestOpinionatedReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED"
+              }
+            ]
+          }
+        },
+        {
+          "number": 118,
+          "title": "Protected repo still wants a review",
+          "url": "https://github.com/acme/repo/pull/118",
+          "isDraft": false,
+          "createdAt": "2026-01-20T00:00:00Z",
+          "headRefName": "b118",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "reviewRequests": {
+            "totalCount": 0
+          },
+          "latestOpinionatedReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED"
               }
             ]
           }
