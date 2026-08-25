@@ -190,8 +190,13 @@ This replaces the `gh-pr` plugin, which did the same thing.
 
 ## Requirements
 
-- Herdr >= 0.8.0
-- `bun`, `git`, and `gh` on your `PATH`, with `gh auth status` clean
+- Herdr >= 0.8.0 — `plugin pane`, `pane report-metadata --title` and
+  `link_handlers` all arrived in it
+- `bun` >= 1.2 — the state files are cleared with `Bun.file().delete()`, which
+  older versions do not have
+- `gh` >= 2.24, with `gh auth status` clean — the check rollup is read from
+  `gh pr checks --json`
+- `git` on your `PATH`
 
 ## Install
 
