@@ -146,8 +146,8 @@ export function ratioChanged(
  * it too: the widget has to find *itself* in `pane list` to set its title, and
  * `HERDR_PANE_ID` cannot answer that — it is the id the process was launched
  * with, and a cross-tab move renames the pane without telling the process
- * (probed 2026-08-25: a live widget's env said `w23:p1` while the pane was
- * `w23:pX`). `tests/manifest.ts` holds this and the manifest title in step.
+ * (probed: a live widget's env said `w23:p1` while the pane was `w23:pX`).
+ * `tests/manifest.test.ts` holds this and the manifest title in step.
  */
 export const WIDGET_LABEL = "prs";
 

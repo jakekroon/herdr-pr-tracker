@@ -14,7 +14,7 @@
  *
  * `reviewDecision` alone is not enough, and this is the trap: GitHub only
  * populates it where a review is *required* by branch protection. Probed
- * 2026-08-25 against this account — four open pull requests carrying an
+ * against a live account — four open pull requests carrying an
  * `APPROVED` review all reported `reviewDecision: null`, so the whole fleet
  * rendered as `clean` and nothing was ever green. `latestOpinionatedReviews`
  * is the answer: one review per reviewer, `COMMENTED` already excluded (which

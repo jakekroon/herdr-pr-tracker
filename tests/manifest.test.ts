@@ -1,5 +1,10 @@
 // The manifest is the plugin's contract with Herdr: a typo in a command path
 // or an action id fails at runtime, in a hook, where nobody is watching.
+//
+// A `.test.ts` file, deliberately: `bun test` only discovers that suffix, so as
+// a plain script this check ran nowhere the README told anyone to look and the
+// packaging bugs it exists to catch would have shipped.
+import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { VIEWS, viewUrl } from "../src/view.ts";
 
@@ -102,10 +107,19 @@ for (const view of VIEWS) {
   }
 }
 
-if (problems.length > 0) {
-  for (const p of problems) console.error(`manifest: ${p}`);
-  process.exit(1);
-}
-console.log(
-  `${manifest.id}: ${commands.length} commands, entrypoint "${entrypoint}" declared, ${(manifest.link_handlers ?? []).length} link handlers, widget label "${widgetLabel}"`,
-);
+// Reported as the whole list rather than one failure at a time: a packaging
+// bug is usually a rename that broke several claims at once, and seeing them
+// together is what says which rename it was.
+test("the manifest matches the code it points at", () => {
+  expect(problems).toEqual([]);
+});
+
+// A manifest that parsed but declared nothing would satisfy every check above
+// by vacuity, so the counts are asserted rather than printed.
+test("the manifest declares the commands and handlers the plugin needs", () => {
+  expect(commands.length).toBeGreaterThan(0);
+  expect(commands.every((c) => c.length >= 2)).toBe(true);
+  expect(manifest.link_handlers?.length).toBe(VIEWS.length);
+  expect(widgetLabel).toBeTruthy();
+  expect(entrypoint).toBeTruthy();
+});

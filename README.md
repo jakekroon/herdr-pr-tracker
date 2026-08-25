@@ -177,10 +177,24 @@ This replaces the `gh-pr` plugin, which did the same thing.
 ## Install
 
 ```bash
-herdr plugin link /path/to/herdr-pr-tracker
+herdr plugin install jakekroon/herdr-pr-tracker
 ```
 
-That is the whole install — no daemon and no config file needed.
+That is the whole install — no daemon, no config file, and nothing to build:
+the plugin has no runtime dependencies, so there is no `bun install` step.
+
+Pin a version with `--ref` if you would rather not track `main`:
+
+```bash
+herdr plugin install jakekroon/herdr-pr-tracker --ref v0.1.0
+```
+
+To work on it instead, link a checkout — the same plugin, read from where you
+edit it:
+
+```bash
+herdr plugin link /path/to/herdr-pr-tracker
+```
 
 ### Keybindings
 
@@ -266,9 +280,20 @@ actually painted, so whatever is hyperlinked is clickable.
 ## Development
 
 ```bash
-bun test        # 281 tests: no network, no gh, no Herdr
+tests/run.sh    # everything below, and what CI runs
+```
+
+or the two halves separately:
+
+```bash
+bun test        # 283 tests: no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
+
+`tests/manifest.test.ts` is the one that is not about rendering: it checks the
+manifest against the code it points at, because a stale command path or an
+unmatched link-handler pattern fails at runtime inside a hook, where nobody is
+watching.
 
 The widget's whole design turns on one distinction: **draft is a modifier on
 open, not an alternative to it.** A draft is still open, still yours, and still

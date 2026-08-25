@@ -15,14 +15,25 @@
 # configurable. A widget whose meaning depends on settings is a widget you have
 # to remember the settings of before you can read it.
 
-# Seconds between GitHub polls. The query costs 3 points of the 5000/hour
-# GraphQL budget regardless of how many PRs come back, so 60s uses about 180 an
-# hour: the limit here is your attention, not the API.
+# Seconds between GitHub polls. Rate-limit cost is charged per `search` field
+# rather than per pull request, so a poll costs the same whatever comes back —
+# a rounding error against the 5000/hour GraphQL budget at any sane interval.
+# The exact point count is deliberately not quoted here: read `rateLimit.cost`
+# off a live response if it matters. The limit is your attention, not the API.
 #POLL_SECONDS=60
 
-# The GitHub search. This is the one knob that changes *what* is tracked — for
-# example swap in `review-requested:@me` to watch other people's PRs instead.
-# `archived:false` keeps unmergeable PRs in archived repos out.
+# The GitHub search. This is the one knob that changes *what* is tracked, and it
+# re-aims the **authored** view entirely — narrow it to one org, say, with
+# `user:acme`. `archived:false` keeps unmergeable PRs in archived repos out.
+#
+# Do NOT point it at `review-requested:@me` to watch other people's PRs: that is
+# what the second view is for (toggle it from the pane header), and it is not
+# the same thing. The inbound view leads its rows with the author, ranks the
+# signals for a reviewer rather than an author, and marks the pull requests
+# nobody actually asked you about. Routed through here those rows would be
+# rendered as though they were yours.
+#
+# This setting deliberately does not reach the inbound view at all.
 #SEARCH_QUERY="is:pr is:open author:@me archived:false"
 
 # Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
