@@ -26,13 +26,29 @@ export interface Layout {
 const rightEdge = (p: LayoutPane) => p.rect.x + p.rect.width;
 
 /**
- * The pane to split off: the rightmost in the tab, and among equally-right
- * panes the tallest.
+ * How short a pane may be, against the tallest in the tab, and still be worth
+ * splitting. A pane below this is a strip along an edge, not a column.
+ */
+const STRIP_FRACTION = 0.8;
+
+/**
+ * The pane to split off: the rightmost full-height pane in the tab, and among
+ * equally-right ones the tallest.
  *
  * Splitting the rightmost pane is what puts the widget in the right-hand
- * column. The tallest-wins tiebreak keeps it off short strips — a tab can carry
- * a five-row widget along its bottom edge, and docking beside that would
- * inherit its height.
+ * column. **Short panes are excluded before rightmost is considered**, and that
+ * ordering is the whole point — it was originally only a tiebreak between panes
+ * with the *same* right edge, which left the ordinary case broken: the sibling
+ * `herdr-motivational-pane` docks a seven-row strip along the bottom of the
+ * right-hand column, so once the widget itself is excluded that strip is the
+ * rightmost thing in the tab outright, with no tie to break. Splitting it
+ * turned it into a five-column full-height sliver and put the widget beside it
+ * — probed 2026-08-25, on every placement, in both directions depending on
+ * which plugin's `follow` ran last.
+ *
+ * So "tall enough to be a column" is a filter, and rightmost decides only among
+ * those. A tab with nothing but strips falls back to all of them rather than
+ * returning null: docking badly beats not docking at all.
  */
 export function dockTarget(
   panes: LayoutPane[],
@@ -40,7 +56,9 @@ export function dockTarget(
 ): LayoutPane | null {
   const candidates = panes.filter((p) => p.pane_id !== exclude && p.rect);
   if (candidates.length === 0) return null;
-  return candidates.reduce((best, p) => {
+  const tallest = candidates.reduce((h, p) => Math.max(h, p.rect.height), 0);
+  const columns = candidates.filter((p) => p.rect.height >= tallest * STRIP_FRACTION);
+  return (columns.length > 0 ? columns : candidates).reduce((best, p) => {
     if (rightEdge(p) !== rightEdge(best)) {
       return rightEdge(p) > rightEdge(best) ? p : best;
     }
@@ -136,6 +154,39 @@ export function ratioChanged(
   if (measured == null) return false;
   if (stored == null) return true;
   return Math.abs(measured - stored) >= epsilon;
+}
+
+/**
+ * Whether a freshly measured width should be written back as the preference.
+ *
+ * `ratioChanged` alone was not enough, and the gap was the case its own comment
+ * claims to cover: "a dock that stops legitimately short of the target must not
+ * be read back as the user having chosen that width". The epsilon is about one
+ * column, so it only ever caught a shortfall of *one column* — a placement that
+ * lands eleven columns short sails straight past it and gets recorded. Measured
+ * 2026-08-25: a stored 0.311 that the walk could only reach 0.258 of was
+ * rewritten to 0.258 by the very next settled run, and each hop would take
+ * another bite.
+ *
+ * So the width a placement actually *achieved* is remembered too, and a
+ * measurement that matches it is treated as the widget's own arithmetic coming
+ * back rather than a choice. A drag moves the split away from both numbers,
+ * which is what makes the two distinguishable at all.
+ *
+ * A drag that happens to land exactly on the achieved width is not recorded —
+ * it is indistinguishable from no drag at all, and it is the width the pane is
+ * already wearing, so nothing on screen changes either way.
+ */
+export function shouldRecordWidth(
+  measured: number | null,
+  stored: number | null,
+  placed: number | null,
+  epsilon = WIDTH_TOLERANCE,
+): boolean {
+  if (measured == null) return false;
+  if (!ratioChanged(measured, stored, epsilon)) return false;
+  if (placed != null && Math.abs(measured - placed) < epsilon) return false;
+  return true;
 }
 
 /**
