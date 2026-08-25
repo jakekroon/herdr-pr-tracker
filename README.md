@@ -183,6 +183,14 @@ herdr plugin install jakekroon/herdr-pr-tracker
 That is the whole install — no daemon, no config file, and nothing to build:
 the plugin has no runtime dependencies, so there is no `bun install` step.
 
+It prints what it is about to register and asks you to confirm. Where there is
+no terminal to ask — a dotfiles bootstrap, a provisioning script, CI — it
+refuses rather than assuming, so add `--yes`:
+
+```bash
+herdr plugin install jakekroon/herdr-pr-tracker --yes
+```
+
 Pin a version with `--ref` if you would rather not track `main`:
 
 ```bash
@@ -195,6 +203,36 @@ edit it:
 ```bash
 herdr plugin link /path/to/herdr-pr-tracker
 ```
+
+### Uninstalling
+
+**Close the widget first, then remove the plugin.** The order matters, and
+getting it wrong leaves a process behind:
+
+```bash
+herdr plugin action invoke herdr-pr-tracker.toggle   # closes the pane
+herdr plugin uninstall herdr-pr-tracker              # or: unlink, for a checkout
+```
+
+Removing the plugin does not stop the pane. The poll loop lives in the pane
+process — that is what makes the widget work at all — and Herdr leaves it running
+when the plugin it belongs to is unregistered. It then has no owner:
+`herdr plugin pane close` answers `plugin_pane_not_found`, because Herdr will not
+act on a plugin pane whose plugin it has forgotten, while the pane is still
+listed and still asking GitHub for your pull requests every sixty seconds.
+
+If you have already uninstalled and left one behind, the ordinary pane command
+still reaches it — find it by its `prs` label:
+
+```bash
+herdr pane list | grep prs
+herdr pane close <pane-id>
+```
+
+Uninstalling leaves the config and state directories alone, so a reinstall keeps
+your width, your chosen view and your cached list. Delete
+`herdr plugin config-dir herdr-pr-tracker` and the plugin's directory under
+`~/.local/state/herdr/plugins` to start clean.
 
 ### Keybindings
 
@@ -286,7 +324,7 @@ tests/run.sh    # everything below, and what CI runs
 or the two halves separately:
 
 ```bash
-bun test        # 283 tests: no network, no gh, no Herdr
+bun test        # 293 tests: no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
 

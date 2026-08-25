@@ -8,6 +8,7 @@ import {
   lockIsStale,
   moveRatio,
   ratioChanged,
+  shouldRecordWidth,
   usableRatio,
   widthStep,
   type WidgetPane,
@@ -30,6 +31,22 @@ describe("dockTarget", () => {
     // widget five rows.
     const panes = [pane("tall", 36, 1, 209, 49), pane("strip", 36, 50, 209, 7)];
     expect(dockTarget(panes, null)?.pane_id).toBe("tall");
+  });
+
+  test("skips a bottom strip that is the rightmost pane outright", () => {
+    // The sibling herdr-motivational-pane docks a seven-row strip along the
+    // bottom of the right-hand column. With the widget itself excluded, that
+    // strip is the rightmost thing in the tab and there is no tie to break —
+    // splitting it turned it into a five-column full-height sliver.
+    const panes = [pane("work", 36, 1, 155, 56), pane("strip", 196, 50, 54, 7)];
+    expect(dockTarget(panes, "widget")?.pane_id).toBe("work");
+  });
+
+  test("a tab of nothing but strips still docks somewhere", () => {
+    // Docking badly beats not docking at all: the filter must not be able to
+    // empty the candidate list.
+    const panes = [pane("a", 0, 50, 100, 7), pane("b", 100, 50, 80, 7)];
+    expect(dockTarget(panes, null)?.pane_id).toBe("b");
   });
 
   test("never returns the widget's own pane", () => {
@@ -267,5 +284,48 @@ describe("moveRatio", () => {
 
   test("a non-finite width falls back to the default rather than NaN", () => {
     expect(moveRatio(Number.NaN)).toBe(0.8);
+  });
+});
+
+describe("shouldRecordWidth", () => {
+  test("records a drag away from both the stored and the reached width", () => {
+    expect(shouldRecordWidth(0.4, 0.311, 0.258)).toBe(true);
+  });
+
+  test("does not record the width a placement fell short at", () => {
+    // The measured bug: stored 0.311, the walk could only reach 0.258 because
+    // the tab was shared with another plugin's pane, and the next settled run
+    // wrote 0.258 back as though the user had chosen it. Each hop then took
+    // another bite.
+    expect(shouldRecordWidth(0.258, 0.311, 0.258)).toBe(false);
+  });
+
+  test("a shortfall inside the epsilon is not recorded either way", () => {
+    expect(shouldRecordWidth(0.315, 0.311, 0.315)).toBe(false);
+  });
+
+  test("with no placement on record it is the old ratioChanged rule", () => {
+    expect(shouldRecordWidth(0.258, 0.311, null)).toBe(true);
+    expect(shouldRecordWidth(0.312, 0.311, null)).toBe(false);
+  });
+
+  test("an unmeasurable width is never recorded", () => {
+    expect(shouldRecordWidth(null, 0.311, 0.258)).toBe(false);
+  });
+
+  test("a first measurement with nothing stored is recorded", () => {
+    expect(shouldRecordWidth(0.25, null, null)).toBe(true);
+  });
+});
+
+describe("lockIsStale as the in-flight test", () => {
+  test("a lock stamped just now means a placement is walking the pane", () => {
+    // What `placementInFlight` leans on: while this is false the settled path
+    // must not record, because the width on screen is mid-walk.
+    expect(lockIsStale(1_000_000, 1_000_100)).toBe(false);
+  });
+
+  test("a lock older than the lease does not hold recording back forever", () => {
+    expect(lockIsStale(1_000_000, 1_000_000 + 20_000)).toBe(true);
   });
 });

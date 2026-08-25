@@ -125,6 +125,36 @@ export async function writeWidthRatio(ratio: number): Promise<void> {
 }
 
 /**
+ * The width a placement actually reached, as opposed to the one it aimed at.
+ *
+ * `pane resize` is layout-dependent and a walk can stop short — a tab shared
+ * with another plugin's pane cannot always give up the columns. Without a record
+ * of what was reached, the next settled run measures the shortfall, finds it
+ * different from the stored preference, and writes it back as though the user
+ * had chosen it. See `shouldRecordWidth`.
+ *
+ * This is deliberately *not* the same file as `width_ratio`: one is what the
+ * user asked for and must survive, the other is a fact about the last placement
+ * and is expected to be overwritten constantly.
+ */
+export async function readPlacedRatio(): Promise<number | null> {
+  try {
+    const n = Number.parseFloat((await Bun.file(join(stateDir(), "placed_ratio")).text()).trim());
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writePlacedRatio(ratio: number): Promise<void> {
+  await Bun.write(join(stateDir(), "placed_ratio"), `${ratio}\n`).catch(() => {});
+}
+
+export async function clearPlacedRatio(): Promise<void> {
+  await Bun.file(join(stateDir(), "placed_ratio")).delete().catch(() => {});
+}
+
+/**
  * Serialise placement across concurrent runs.
  *
  * `tab.focused` and `workspace.focused` both run `follow`, and Herdr fires them
@@ -158,6 +188,30 @@ export async function takePlacementLock(): Promise<boolean> {
     } catch {
       return false;
     }
+  }
+}
+
+/**
+ * Whether a placement is in flight right now.
+ *
+ * The settled path deliberately does not *take* the lock — two runs both
+ * deciding not to act cannot conflict — but it does have to know when another
+ * run is mid-walk. Measured 2026-08-25: closing and re-docking the widget let a
+ * hook-fired settled run measure the pane while `applyWidth` was still stepping
+ * it, read `placed_ratio` before the placing run had written it, and record the
+ * half-walked width as the user's preference. `placed_ratio` cannot cover that
+ * window on its own because it is only written once the walk has finished.
+ */
+export function placementInFlight(): boolean {
+  try {
+    const heldSince = Number.parseInt(
+      readFileSync(join(stateDir(), "placing.lock"), "utf8").trim(),
+      10,
+    );
+    return !lockIsStale(heldSince, Date.now());
+  } catch {
+    // No lock file, or an unreadable one: nothing is provably in flight.
+    return false;
   }
 }
 
