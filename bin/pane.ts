@@ -297,6 +297,14 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 process.on("SIGHUP", shutdown);
+// A throw anywhere — a paint, the loop, a rejected fetch nothing caught — would
+// otherwise take the process out *without* releasing the mouse or the alt
+// screen, and the terminal keeps reporting into whatever Herdr puts in this
+// cell next. The widget is long-lived enough to outlive plugin reloads, so the
+// one exit path that skips `shutdown` is worth closing even though nothing is
+// known to reach it.
+process.on("uncaughtException", shutdown);
+process.on("unhandledRejection", shutdown);
 // A resize only needs a repaint, which the loop already does every tick.
 process.stdout.on("resize", () => paint());
 

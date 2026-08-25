@@ -1,0 +1,22 @@
+# The whole gate is offline by design — no network, no `gh`, no running Herdr —
+# so CI is the same script a developer runs locally rather than a second,
+# drifting definition of "green".
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      # Only devDependencies (@types/bun, typescript) — the plugin itself has no
+      # runtime dependencies, which is why installing it needs no build step.
+      - run: bun install --frozen-lockfile
+      - run: tests/run.sh

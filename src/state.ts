@@ -3,7 +3,7 @@
 // last-good result, toggling the widget shows an empty pane for a whole poll
 // interval, which is indistinguishable from "you have no open PRs".
 
-import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { lockIsStale } from "./dock.ts";
 import type { PrRow } from "./model.ts";
@@ -46,10 +46,15 @@ export async function writeSnapshot(s: Snapshot, view: View = DEFAULT_VIEW): Pro
   try {
     // Write-then-rename so a renderer killed mid-write cannot leave a
     // truncated file that reads as "no open PRs" on the next start.
+    //
+    // `renameSync`, and deliberately not `Bun.write(path, Bun.file(tmp))`:
+    // probed 2026-08-25, that copies onto the destination's *existing inode*
+    // rather than renaming — the destination is truncated in place, which is
+    // exactly the window this is meant to close. Nothing in Bun's write API
+    // renames, so the atomic step comes from `node:fs`.
     const tmp = `${path}.tmp`;
     await Bun.write(tmp, JSON.stringify(s));
-    await Bun.write(path, Bun.file(tmp));
-    await Bun.file(tmp).delete().catch(() => {});
+    renameSync(tmp, path);
   } catch {
     // Caching is a convenience; failing to cache must never break the pane.
   }
