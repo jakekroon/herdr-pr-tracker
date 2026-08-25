@@ -218,7 +218,7 @@ herdr plugin install jakekroon/herdr-pr-tracker --yes
 Pin a version with `--ref` if you would rather not track `main`:
 
 ```bash
-herdr plugin install jakekroon/herdr-pr-tracker --ref v0.1.1
+herdr plugin install jakekroon/herdr-pr-tracker --ref v0.2.0
 ```
 
 To work on it instead, link a checkout — the same plugin, read from where you
