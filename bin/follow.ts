@@ -29,24 +29,31 @@ import {
   moveRatio,
   ratioChanged,
   usableRatio,
+  WIDGET_LABEL,
   widthStep,
 } from "../src/dock.ts";
-import { closePluginPane, listPanes, movePane, openPluginPane, resizePane } from "../src/herdr.ts";
+import {
+  closePluginPane,
+  listPanes,
+  movePane,
+  openPluginPane,
+  resizePane,
+  setPaneTitle,
+} from "../src/herdr.ts";
 import {
   clearPaneId,
   readPaneId,
+  readView,
   readWidthRatio,
   releasePlacementLock,
   takePlacementLock,
   writePaneId,
   writeWidthRatio,
 } from "../src/state.ts";
+import { VIEW_TITLE } from "../src/view.ts";
 
 const HERDR = process.env.HERDR_BIN_PATH ?? "herdr";
 const ENTRYPOINT = "prs";
-/** The manifest's `[[panes]].title`, which Herdr reports as the pane's label.
- * `tests/manifest.ts` holds the two in step. */
-const WIDGET_LABEL = "prs";
 /** Cap on resize steps. The approach halves its step as it closes, so this is a
  * backstop against a layout that will not move, not a normal exit. */
 const MAX_WIDTH_STEPS = 12;
@@ -246,11 +253,23 @@ async function main(): Promise<number> {
   // second run would resize the same widget a second time, landing it at a width
   // neither run intended. The loser exits: the winner is doing identical work.
   if (!(await takePlacementLock())) return 0;
+  let code: number;
   try {
-    return await place(l, stored, recorded);
+    code = await place(l, stored, recorded);
   } finally {
     releasePlacementLock();
   }
+
+  // The title names the view the pane is showing, and the pane process sets it
+  // when the view changes — but it cannot set it for a pane it has not been
+  // told about. A freshly opened widget has no title yet, and a moved one wears
+  // an id the renderer's `HERDR_PANE_ID` no longer names, so the title is
+  // re-applied here, where the id that actually landed is on hand. Only on the
+  // placing path: the settled early exit above deliberately costs no herdr
+  // calls.
+  const placed = await readPaneId();
+  if (placed) await setPaneTitle(placed, VIEW_TITLE[await readView()]);
+  return code;
 }
 
 process.exit(await main());

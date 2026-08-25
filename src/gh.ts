@@ -1,8 +1,14 @@
 // The only module that talks to GitHub. Everything it returns is plain data,
 // so the model and render layers stay testable without a network or a token.
 
-import { parseSearch, type PrList } from "./model.ts";
-import { SEARCH_QUERY } from "./query.ts";
+import { parseInbound, parseSearch, type PrList } from "./model.ts";
+import {
+  INBOUND_QUERY,
+  inboundComplete,
+  INBOUND_SEARCHES,
+  SEARCH_PAGE,
+  SEARCH_QUERY,
+} from "./query.ts";
 
 export type GhFailure = "auth" | "network" | "rate" | "other";
 
@@ -61,28 +67,18 @@ export function classify(err: string): GhError {
 }
 
 /**
- * Fetch every open PR the search matches, in one request.
+ * One GraphQL request, with the error handling both views need.
  *
- * `threads` caps reviewThreads per PR; a PR at the cap reports its unresolved
- * count as a floor rather than a confident number (model.unresolvedCapped).
+ * `hasData` decides what counts as a usable answer, which is the only thing
+ * that differs between them: the authored view needs its one search, and the
+ * inbound view is content with any one of its three — losing a search is a
+ * thinner list, not a failed refresh.
  */
-export async function fetchPrs(
-  query: string,
-  maxPrs: number,
-  threads = 100,
-): Promise<PrList> {
-  const r = await run([
-    "api",
-    "graphql",
-    "-f",
-    `query=${SEARCH_QUERY}`,
-    "-F",
-    `q=${query}`,
-    "-F",
-    `prs=${maxPrs}`,
-    "-F",
-    `threads=${threads}`,
-  ]);
+async function graphql(
+  args: string[],
+  hasData: (data: Record<string, unknown>) => boolean,
+): Promise<unknown> {
+  const r = await run(["api", "graphql", ...args]);
   if (!r.ok) throw classify(r.err || r.out);
 
   let payload: unknown;
@@ -95,11 +91,59 @@ export async function fetchPrs(
   // GraphQL reports failures with HTTP 200 and an `errors` array. Partial data
   // alongside errors is still worth rendering; no data at all is a failure.
   const errors = (payload as { errors?: Array<{ message?: string }> })?.errors;
-  const hasData = Boolean((payload as { data?: { search?: unknown } })?.data?.search);
-  if (Array.isArray(errors) && errors.length > 0 && !hasData) {
+  const data = (payload as { data?: Record<string, unknown> })?.data ?? {};
+  if (Array.isArray(errors) && errors.length > 0 && !hasData(data)) {
     throw classify(errors.map((e) => e?.message ?? "").join(" "));
   }
+  return payload;
+}
+
+/**
+ * Fetch every open PR the search matches, in one request.
+ *
+ * `threads` caps reviewThreads per PR; a PR at the cap reports its unresolved
+ * count as a floor rather than a confident number (model.unresolvedCapped).
+ */
+export async function fetchPrs(
+  query: string,
+  maxPrs: number,
+  threads = 100,
+): Promise<PrList> {
+  const payload = await graphql([
+    "-f",
+    `query=${SEARCH_QUERY}`,
+    "-F",
+    `q=${query}`,
+    "-F",
+    `prs=${maxPrs}`,
+    "-F",
+    `threads=${threads}`,
+  ], (data) => Boolean(data.search));
   return parseSearch(payload, threads);
+}
+
+/**
+ * Fetch the inbound view: the three searches GitHub has no `OR` for, aliased
+ * into one document so it is still a single request.
+ *
+ * Deliberately not parameterised by a config query. The three are load-bearing
+ * for the reviewer/involved distinction, and an override would break what the
+ * glyph means with no way for the reader to notice.
+ */
+export async function fetchInbound(maxPrs: number, threads = 100): Promise<PrList> {
+  const payload = await graphql([
+    "-f",
+    `query=${INBOUND_QUERY}`,
+    ...INBOUND_SEARCHES.flatMap((s) => ["-F", `${s.alias}=${s.q}`]),
+    "-F",
+    // Each search is paged in full and the configured cap is applied to the
+    // union afterwards, which is where it belongs: three searches each capped
+    // at 20 can between them miss a row that belongs in the top 20 overall.
+    `prs=${SEARCH_PAGE}`,
+    "-F",
+    `threads=${threads}`,
+  ], inboundComplete);
+  return parseInbound(payload, threads, maxPrs);
 }
 
 /**

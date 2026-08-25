@@ -122,6 +122,47 @@ describe("parseSearch", () => {
     expect(byNumber(102).unresolvedCapped).toBe(false);
   });
 
+  // GitHub populates reviewDecision only where branch protection requires a
+  // review, so on an unprotected repository these are the *only* thing that
+  // distinguishes an approved pull request from an unreviewed one.
+  describe("a review state GitHub declines to decide", () => {
+    test("an approval with no branch protection is still approved", () => {
+      const row = byNumber(114);
+      expect(row.review).toBe("APPROVED");
+      expect(headline(row)).toBe("approved");
+    });
+
+    test("a request for changes outranks an approval", () => {
+      expect(byNumber(115).review).toBe("CHANGES_REQUESTED");
+    });
+
+    test("a review asked for and not given reads as required", () => {
+      const row = byNumber(116);
+      expect(row.review).toBe("REVIEW_REQUIRED");
+      expect(headline(row)).toBe("review-required");
+    });
+
+    test("an approval in hand outranks a request still outstanding", () => {
+      expect(byNumber(117).review).toBe("APPROVED");
+    });
+
+    test("a decision GitHub does give is never second-guessed", () => {
+      expect(byNumber(118).review).toBe("REVIEW_REQUIRED");
+    });
+
+    test("COMMENTED reviews are not an opinion", () => {
+      const node = {
+        ...states.data.search.nodes[0],
+        reviewDecision: null,
+        reviewRequests: { totalCount: 0 },
+        latestOpinionatedReviews: { nodes: [{ state: "COMMENTED" }] },
+      };
+      const out = parseSearch({ data: { search: { issueCount: 1, nodes: [node] } } });
+      expect(out.rows[0]!.review).toBeNull();
+      expect(headline(out.rows[0]!)).toBe("clean");
+    });
+  });
+
   test("an unrecognised reviewDecision degrades to null", () => {
     const odd = { data: { search: { issueCount: 1, nodes: [{ ...states.data.search.nodes[0], reviewDecision: "SOMETHING_NEW" }] } } };
     expect(parseSearch(odd).rows[0]!.review).toBeNull();

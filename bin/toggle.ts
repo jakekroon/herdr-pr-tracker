@@ -5,7 +5,7 @@
 // nothing: with the pane gone there is no poll loop and no gh calls. The
 // cached list in the state dir is what makes reopening instant.
 
-import { closePluginPane, listPanes } from "../src/herdr.ts";
+import { closePluginPane, listPanes, openWidget } from "../src/herdr.ts";
 import { clearPaneId, readPaneId } from "../src/state.ts";
 
 const known = await readPaneId();
@@ -18,12 +18,5 @@ if (alive && known) {
   // A recorded id for a pane that no longer exists is stale; clear it so
   // follow opens a fresh one rather than trying to move a ghost.
   if (known) await clearPaneId();
-  // follow is the single place that knows where the widget belongs, and it is
-  // idempotent, so opening is just "converge on having one".
-  const root = process.env.HERDR_PLUGIN_ROOT ?? ".";
-  const p = Bun.spawn(["bun", `${root}/bin/follow.ts`], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  process.exit(await p.exited);
+  process.exit(await openWidget());
 }
