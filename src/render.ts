@@ -9,7 +9,7 @@ import {
   type ReviewDecision,
   type Signal,
 } from "./model.ts";
-import { DEFAULT_VIEW, type View } from "./view.ts";
+import { DEFAULT_VIEW, otherView, SWITCHER_LABELS, type View, viewUrl } from "./view.ts";
 
 const ESC = "\x1b";
 const DIM = `${ESC}[2m`;
@@ -156,12 +156,89 @@ function clip(s: string, max: number): string {
   return cp.slice(0, max - 1).join("") + ELLIPSIS;
 }
 
-/** OSC 8 hyperlink. Herdr's renderer carries hyperlinks per cell and handles
- * the click itself, so the plugin never has to claim the mouse or shell out to
- * a browser — which is what lets the pane stay keyboard-deaf. */
+/** OSC 8 hyperlink. Herdr's renderer carries hyperlinks per cell and would
+ * resolve the click itself, but this pane claims the mouse, so it no longer
+ * gets the chance: a click here is decoded by `src/mouse.ts`, located in the
+ * painted frame by `hitTargets`, and opened by `src/open.ts`. The escape is
+ * still what marks a span as clickable — the hit map is derived from it. */
 export function link(url: string, text: string, on: boolean): string {
   if (!on || !url) return text;
   return `${ESC}]8;;${url}${ESC}\\${text}${ESC}]8;;${ESC}\\`;
+}
+
+/** A clickable span of a painted frame: the visible columns some hyperlink
+ * covers on some line. Rows and columns are 1-based, matching the mouse
+ * reports they are compared against. */
+export interface HitTarget {
+  row: number;
+  /** First and last visible column, inclusive. */
+  from: number;
+  to: number;
+  url: string;
+}
+
+/**
+ * Where the links are in a frame that has already been rendered.
+ *
+ * Derived from the painted lines rather than computed alongside them, which is
+ * the point: **whatever is hyperlinked is clickable, by construction.** A second
+ * function that re-derived the layout would be a copy that drifts, and the
+ * failure mode of a drifted hit map — a click that opens the wrong pull request
+ * — is silent.
+ *
+ * The walk has to skip escapes the way `width` does, but it cannot use `width`
+ * on the whole line: it needs the running column at the point each hyperlink
+ * opens and closes, not the total.
+ */
+export function hitTargets(lines: string[]): HitTarget[] {
+  const out: HitTarget[] = [];
+  const OPEN = `${ESC}]8;;`;
+  const ST = `${ESC}\\`;
+  lines.forEach((line, i) => {
+    let col = 1;
+    let url: string | null = null;
+    let from = 1;
+    let j = 0;
+    while (j < line.length) {
+      if (line[j] !== ESC) {
+        // A visible run: everything up to the next escape.
+        const next = line.indexOf(ESC, j);
+        const chunk = next === -1 ? line.slice(j) : line.slice(j, next);
+        col += width(chunk);
+        j += chunk.length;
+        continue;
+      }
+      if (line.startsWith(OPEN, j)) {
+        const end = line.indexOf(ST, j);
+        // An unterminated OSC 8 is a truncation bug upstream; the rest of the
+        // line is not trustworthy, so stop rather than guess where it ended.
+        if (end === -1) break;
+        const href = line.slice(j + OPEN.length, end);
+        if (href) {
+          url = href;
+          from = col;
+        } else if (url) {
+          if (col > from) out.push({ row: i + 1, from, to: col - 1, url });
+          url = null;
+        }
+        j = end + ST.length;
+        continue;
+      }
+      const sgr = /^\x1b\[[0-9;]*m/.exec(line.slice(j));
+      j += sgr ? sgr[0].length : 1;
+    }
+    if (url && col > from) out.push({ row: i + 1, from, to: col - 1, url });
+  });
+  return out;
+}
+
+/**
+ * The target under a click, or null.
+ *
+ * Columns are inclusive at both ends: the last column of a link is part of it.
+ */
+export function hitAt(targets: HitTarget[], row: number, col: number): HitTarget | null {
+  return targets.find((t) => t.row === row && col >= t.from && col <= t.to) ?? null;
 }
 
 /** The right-hand status cluster, fixed-width so it aligns down the pane.
@@ -235,6 +312,45 @@ function prAge(row: PrRow, now: number): string {
 }
 
 /**
+ * Splice the view switcher into a header line, between what the pane is showing
+ * and how old it is.
+ *
+ * The switcher says what it does rather than naming a view — the pane's title
+ * is where the current view is named — and is dim and hyperlinked.
+ * The pane claims the mouse, so a **plain click** on it lands in `handleClick`,
+ * which recognises this URL as its own and switches the view. The URL is still
+ * a real GitHub list rather than a private scheme: wherever the capture does
+ * not apply — another terminal, a ctrl-click routed to the registered
+ * `[[link_handlers]]` entry — the control has to stay something worth
+ * clicking. See `viewUrl`.
+ *
+ * It buys its columns from the line's **slack**, never out of the summary. The
+ * summary is what this line exists to say: how many pull requests there are and
+ * how old the data on screen is. Clipping that to make room for a control would
+ * be the same class of lie the stale-age colour exists to prevent, so a pane too
+ * narrow to hold both keeps a shorter label, and one too narrow for even the
+ * shortest simply has no switcher — the toggle action and any key bound to it
+ * still work.
+ *
+ * `head` and `tail` are the plain line either side of the insertion point, and
+ * are painted separately: the switcher's dim run has to open and close between
+ * them, and closing it with NORMAL rather than a reset is what keeps the tail's
+ * colour intact (SGR intensity does not nest).
+ */
+function withSwitcher(head: string, tail: string, colour: keyof typeof FG, o: RenderOpts): string {
+  const target = otherView(o.view ?? DEFAULT_VIEW);
+  const slack = o.cols - leadWidth(o.view) - width(head) - width(tail);
+  // Longest first, and the first that fits wins: a narrow pane gets a control
+  // that says less rather than none at all. The cost of a label is the label
+  // plus the " · " that separates it from the summary.
+  const label = SWITCHER_LABELS.find((l) => width(l) + 3 <= slack);
+  if (!label) return paint(head + tail, colour, o.colour);
+  return paint(head, colour, o.colour) +
+    dim(" · ", o.colour) + link(viewUrl(target), dim(label, o.colour), true) +
+    paint(tail, colour, o.colour);
+}
+
+/**
  * The one line the pane is never without, so it carries the summary rather
  * than only the clock: how many PRs are open, how many of them are yours to
  * act on, and how old the data on screen is.
@@ -255,8 +371,10 @@ export function header(rows: PrRow[], o: RenderOpts): string {
       ? `${spinner(o.now)} loading inbound…`
       : `${spinner(o.now)} loading…`;
     const text = o.error ? o.error : loading;
-    return indentFor(o) + paint(clip(text, o.cols - leadWidth(o.view)),
-      o.error ? "red" : "default", o.colour);
+    const body = clip(text, o.cols - leadWidth(o.view));
+    // Nothing has been fetched, so there is no age for the switcher to sit in
+    // front of: it goes last, where the timer will be.
+    return indentFor(o) + withSwitcher(body, "", o.error ? "red" : "default", o);
   }
   const age = o.now - o.fetchedAt;
   const stale = age > o.pollSeconds * 2000;
@@ -276,15 +394,23 @@ export function header(rows: PrRow[], o: RenderOpts): string {
     summary = `${total} open` + (loud > 0 ? ` · ${loud} need you` : "");
   }
 
-  const text = o.error
-    ? `${summary} · ${relativeAge(age)} — ${o.error}`
-    : `${summary} · ${relativeAge(age)}`;
+  // Split where the switcher goes: after what the pane is showing, before how
+  // old it is. Clipping happens on the whole line, so the tail is what gives way
+  // on a narrow pane — never the count.
+  const tail = o.error
+    ? ` · ${relativeAge(age)} — ${o.error}`
+    : ` · ${relativeAge(age)}`;
+  const text = summary + tail;
   const colour: keyof typeof FG = o.error
     ? "red"
     : stale
     ? "yellow"
     : "default";
-  return indentFor(o) + paint(clip(text, o.cols - leadWidth(o.view)), colour, o.colour);
+  const body = clip(text, o.cols - leadWidth(o.view));
+  // A clip that ate into the summary leaves no insertion point, and the whole
+  // line is already over budget — so the switcher is not offered at all.
+  const head = body.startsWith(summary) ? summary : body;
+  return indentFor(o) + withSwitcher(head, body.slice(head.length), colour, o);
 }
 
 /** A repo group: one header line and the branches under it. */

@@ -58,11 +58,10 @@ export async function writeSnapshot(s: Snapshot, view: View = DEFAULT_VIEW): Pro
 /**
  * The chosen view, persisted so it outlives the pane process.
  *
- * The pane owns the poll loop, so the two view actions cannot fetch anything
- * themselves without racing it — they write here instead and the renderer picks
- * the change up on its next tick, the same shape as the refresh marker. Unlike
- * that marker this one is *not* deleted on read: it is a preference, not a
- * request.
+ * The pane owns the poll loop, so the toggle action cannot fetch anything
+ * itself without racing it — it writes here instead and the renderer picks the
+ * change up on its next tick, the same shape as the refresh marker. Unlike that
+ * marker this one is *not* deleted on read: it is a preference, not a request.
  */
 export async function readView(): Promise<View> {
   try {

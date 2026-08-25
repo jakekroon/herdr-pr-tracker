@@ -12,21 +12,22 @@ It has a second view, for the other half of the same problem: the pull requests
 [Two views](#two-views).
 
 ```
-   5 open · 2 need you · 12s ago
-platform-infra-tools ───────────────────────
-   add_metrics                       ◆ ⚑4  ✓
+   5 open · 2 need you · toggle · 12s ago
+
+platform ───────────────────────────────── 1
+   feat/job-idempotency              ◆ ⚑4  ✓
     #1526 Make the background job idemp… 39d
 
-web-app ────────────────────────────────────
-   TICKET-101-4-permissions                ✓
+web-app ────────────────────────────────── 1
+   fix/payload-fields                      ✓
     #12760 Trim the payload to the field… 4d
-▪  TICKET-101-7-tests                  ⚑1  ✓
+▪  chore/importer-dry-run              ⚑1  ✓
     #4417 Give the importer a dry-run mo… 4d
 
-metrics-service ────────────────────────────
-▪◌ TICKET-104                              ✓
+metrics-service ──────────────────────────
+▪◌ feat/settings-tabs                      ✓
     #208 Split the settings page into ta… 2h
- ◌ TICKET-105                              ✓
+ ◌ chore/nightly-import                    ✓
     #412 Move the nightly import behind … 1h
 ```
 
@@ -47,9 +48,10 @@ opens in your browser.
 | `✓` in the review column | Approved | green |
 | `✓` in the check column | Checks passing | green |
 | `◌` | Draft — dims the whole row | dim |
-| **bold** branch | Changes requested, failing checks or unresolved threads — the three that are yours to act on | — |
+| **bold** branch | *My PRs only* — changes requested, failing checks or unresolved threads: the three that are yours to act on | — |
 | `▪` | A Herdr workspace is open on this branch | dim |
-| `◦` | *Inbound view only* — you are in the conversation but nobody asked you | plain |
+| `◦` | *Awaiting Review only* — you are in the conversation but nobody asked you | plain |
+| `N` at the end of a repository rule | *My PRs only* — how many of that repository's pull requests need you | the loudest of them |
 | *nothing* | Ready for review, nothing to do | plain |
 
 A pull request can carry several of these at once, so each is drawn separately —
@@ -86,20 +88,34 @@ If the list is taller than the pane, the rows are **halved before any of them is
 dropped**: the title line goes and its hyperlink moves onto the branch, so a
 squeezed pane still shows every pull request, its signals and its link. Only when
 even that overflows are rows dropped, and then the *oldest* go, with a `… +N
-older` row at the top — your newest work is never what falls off the end.
+older` row standing in for them — your newest work is never what falls off the
+end. The marker always sits next to the rows it stands for, so it is the first
+row in this view and the last one in the other (see [Two views](#two-views)).
 
 ## Two views
 
-The pane lists one of two things, and you switch between them from the Herdr
-action palette:
+The pane lists one of two things, and **the pane's own title says which**:
 
-| Action | Shows |
+| Pane title | Shows |
 |---|---|
-| **Show my PRs** | The pull requests you opened. The default. |
-| **Show PRs to review** | The pull requests waiting on you: your review was asked for, you have already given one, or you are in the conversation. |
+| **My PRs** | The pull requests you opened. The default. The *authored* view, in the code and below. |
+| **Awaiting Review** | The pull requests waiting on you: your review was asked for, you have already given one, or you are in the conversation. The *inbound* view. |
+
+The dim toggle in the middle of the summary line is the control — `toggle view`
+where there is room for it, and just `toggle` where there is not, as in the first
+example above. **Click it** and the pane switches, and the title changes with it.
+No modifier, no setup.
+
+The pane reads its own mouse, so a click on any pull request opens it in the
+browser too. The same toggle is reachable from `herdr plugin action invoke` and
+from a keybinding you bind yourself (see below).
+
+The control buys its columns from whatever the summary and the age leave over:
+a narrow pane shortens it to `toggle` and then to `⇄`, and one narrower still
+drops it altogether — the count and the age are what the line exists to say.
 
 ```
-    3 inbound · 12s ago
+    3 inbound · toggle view · 12s ago
 
 platform ─────────────────────────────────
     priya chore/toolchain                  ●
@@ -121,13 +137,16 @@ reason — the work is somebody else's:
 - **`◦` marks a row nobody asked you to look at** — you were assigned,
   mentioned, or you left a comment. A row with no mark is one where your review
   was actually requested, which is the ordinary reason to be here.
-- **The colour order nearly inverts.** *Review required* leads, because it is
-  the point of the view. *Changes requested* comes last, because it is usually
-  your own verdict already delivered. Failing checks and unresolved threads sit
-  in between: they are the author's job, and a red pull request is one it is too
-  early to read.
+- **The colour order nearly inverts** — the same seven signals, ranked again:
+  review required, checks running, clean, unresolved threads, failing checks,
+  approved, changes requested. *Review required* leads, because it is the point
+  of the view. *Changes requested* comes last, because it is usually your own
+  verdict already delivered. Failing checks and unresolved threads sit low for
+  the same reason: they are the author's job, and a red pull request is one it
+  is too early to read.
 
-There is no needs-you count, because every row in the view needs you. Ordering
+There is no needs-you count, in the summary or on the bands, and no bold,
+because every row in the view needs you. Ordering
 is **newest first** here, the opposite of the authored view, and for a specific
 reason: GitHub drops a review request the moment you review, so this view folds
 in what you have *already* reviewed to let you watch what happens next — which
@@ -165,8 +184,9 @@ That is the whole install — no daemon and no config file needed.
 
 ### Keybindings
 
-A plugin cannot ship its own keybinding. To reach the actions by keystroke, add
-them to `~/.config/herdr/config.toml` and run `herdr server reload-config`:
+A plugin cannot ship its own keybinding — Herdr has no action palette either, so
+clicking the header switcher and `herdr plugin action invoke` are the two routes
+that need no setup. To reach the actions by keystroke, add them to `~/.config/herdr/config.toml` and run `herdr server reload-config`:
 
 ```toml
 [[keys.command]]
@@ -184,17 +204,12 @@ description = "refresh PR status"
 [[keys.command]]
 key = "prefix+m"
 type = "plugin_action"
-command = "herdr-pr-tracker.view-authored"
-description = "show my PRs"
-
-[[keys.command]]
-key = "prefix+n"
-type = "plugin_action"
-command = "herdr-pr-tracker.view-inbound"
-description = "show PRs to review"
+command = "herdr-pr-tracker.view-toggle"
+description = "toggle PR view"
 ```
 
-Both view actions open the pane if it is closed, so neither needs `toggle` first.
+The view toggle opens the pane if it is closed, so it does not need `toggle`
+first.
 
 Avoid `alt+` chords (they emit characters in the terminal), and pick keys that do
 not collide with the built-ins: `o`, `g`, `r`, `v` and `e` are taken.
@@ -219,9 +234,13 @@ settings of before you can read it.
 ## How it works
 
 One `gh api graphql` request per poll fetches every pull request and everything
-about it — 3 points of the 5000/hour budget regardless of how many come back, so
-the default 60-second poll costs about 180 an hour. Unresolved review threads are
-the reason it is GraphQL and not `gh pr list`: `isResolved` exists nowhere else.
+about it. Rate-limit cost is charged per `search` field rather than per pull
+request, so the authored view costs the same whatever comes back and the inbound
+view — three searches aliased into one document — costs proportionally more; both
+are a rounding error against the 5000/hour budget at the default 60-second poll.
+Every response carries `rateLimit { cost remaining }` if you want the real
+number. Unresolved review threads are the reason it is GraphQL and not
+`gh pr list`: `isResolved` exists nowhere else.
 
 Herdr has no background-poll mechanism for plugins, so the poll loop lives in the
 pane process itself — the one part of a plugin allowed to stay alive. The pane
@@ -231,17 +250,23 @@ on screen through the trip.
 It never shows stale data as though it were fresh. The header carries the age of
 what is on screen; past two poll intervals it turns yellow, and a failed refresh
 turns it red and says why (`auth failed`, `offline`, `rate limited`) while still
-admitting how old the rows are. An empty list says `0 open` and `✓ all clear`, so
+admitting how old the rows are. An empty list says `0 open` — `0 inbound` in the other view — and `✓ all clear`, so
 "nothing to do" is never confusable with "the widget is broken".
 
 The pane takes no keyboard input and cannot be typed into or killed with a
-keystroke. It does **not** claim the mouse, because mouse events have to reach
-Herdr for the title hyperlinks to work.
+keystroke. It **does** claim the mouse, in press/release SGR reporting only. That
+reverses the original design, and for a measured reason: on iTerm2 a ctrl-click —
+the modifier Herdr's own link handling is keyed to — never reaches the terminal,
+because macOS claims it as the secondary click. The plain click is the only one a
+pane can act on, and a pane only gets it by claiming the mouse. The cost is that
+Herdr no longer resolves this pane's hyperlinks, so the pane opens them itself,
+and only `http(s)` ones. The clickable spans are derived from the frame that was
+actually painted, so whatever is hyperlinked is clickable.
 
 ## Development
 
 ```bash
-bun test        # 250 tests: no network, no gh, no Herdr
+bun test        # 281 tests: no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
 

@@ -89,6 +89,24 @@ export async function setToken(paneId: string, name: string, value: string): Pro
   ]);
 }
 
+/**
+ * Set the pane's display title — the name Herdr paints on the pane header.
+ *
+ * Deliberately `report-metadata --title` rather than `pane rename`. Rename
+ * rewrites the pane's `label`, and `label` is the discriminator `adoptWidget`
+ * matches the widget on: a title that changed with the view would make the
+ * widget unrecognisable in one of them, and the only symptom is orphan panes
+ * quietly accumulating. The metadata title is display-only and leaves `label`
+ * alone — probed 2026-08-25, `pane list` reports the two independently.
+ */
+export async function setPaneTitle(paneId: string, title: string): Promise<void> {
+  await call([
+    "pane", "report-metadata", paneId,
+    "--source", METADATA_SOURCE,
+    "--title", title,
+  ]);
+}
+
 export async function clearToken(paneId: string, name: string): Promise<void> {
   await call([
     "pane", "report-metadata", paneId,

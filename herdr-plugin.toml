@@ -61,21 +61,46 @@ description = "Show or hide the PR list widget"
 contexts = ["global"]
 command = ["bun", "bin/toggle.ts"]
 
-# The two view actions. Idempotent rather than one toggle, so each title is a
-# promise about what you will be looking at and either can be bound to a key
-# without your knowing which view you are in. Both write the preference and let
-# the pane process pick it up: it owns the poll loop, and two processes fetching
-# would race.
+# The view action. One toggle rather than two idempotent "show me X" actions,
+# because the pane header now names the view you are in ("My PRs" / "Awaiting
+# Review", set with `pane report-metadata --title`) — so a control that promises
+# a destination would be repeating a fact already on screen, and two controls
+# would be two places for it to drift. Two views means "the other one" is
+# unambiguous.
+#
+# It writes the preference and lets the pane process pick it up: the pane owns
+# the poll loop, and two processes fetching would race.
 [[actions]]
-id = "view-authored"
-title = "Show my PRs"
-description = "List the pull requests you opened"
+id = "view-toggle"
+title = "Toggle PR view"
+description = "Switch between the PRs you opened and the ones waiting on your review"
 contexts = ["global"]
-command = ["bun", "bin/view.ts", "authored"]
+command = ["bun", "bin/view.ts"]
 
-[[actions]]
-id = "view-inbound"
-title = "Show PRs to review"
-description = "List the pull requests waiting on your review"
-contexts = ["global"]
-command = ["bun", "bin/view.ts", "inbound"]
+# The header's view switcher: the dim control in the pane's top line is an
+# OSC 8 hyperlink. The pane claims the mouse and acts on a plain click itself,
+# so these handlers are the *other* route — Herdr sends a ctrl-click on a
+# terminal URL to the first matching handler, which still works in a terminal
+# that delivers one (macOS claims ctrl-click as the secondary click, so iTerm2
+# does not). They cost nothing where that click never arrives.
+#
+# The URL is GitHub's own list of exactly the pull requests the view being
+# switched *to* shows, so a click that reaches neither route is still not a dead
+# end. Both URLs fire the one toggle action, which is correct rather than lossy:
+# whichever list you ctrl-clicked is by construction the view you are not in.
+#
+# `pattern` is a Rust regular expression, so the dots are escaped and both ends
+# anchored. Anchoring is what keeps the registration honest: a pattern
+# registration is global, and an unanchored one would also claim any longer URL
+# that merely contains this one, in any pane, including inside agent output.
+[[link_handlers]]
+id = "view-authored-link"
+title = "Toggle PR view"
+pattern = "^https://github\\.com/pulls$"
+action = "view-toggle"
+
+[[link_handlers]]
+id = "view-inbound-link"
+title = "Toggle PR view"
+pattern = "^https://github\\.com/pulls/review-requested$"
+action = "view-toggle"

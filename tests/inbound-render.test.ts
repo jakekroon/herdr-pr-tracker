@@ -13,6 +13,7 @@ import {
   width,
 } from "../src/render.ts";
 import { groupRows } from "../src/render.ts";
+import { SWITCHER_LABELS, VIEW_TITLE, viewUrl } from "../src/view.ts";
 
 const list = parseInbound(await Bun.file("tests/fixtures/inbound.json").json());
 const NOW = Date.parse("2026-08-25T09:00:00Z");
@@ -39,6 +40,11 @@ const pr = (n: number): PrRow => {
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "")
   .replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 
+/** The header minus its view switcher, so an assertion about what the summary
+ * claims reads the summary and not the control beside it. */
+const summary = (line: string) =>
+  plain(line).replace(/ · (toggle view|toggle|⇄)(?= · |$)/, "");
+
 describe("header", () => {
   test("names the view, because an empty list looks the same in both", () => {
     expect(plain(header(list.rows, opts()))).toContain("inbound");
@@ -51,16 +57,90 @@ describe("header", () => {
   test("names the view before the first fetch too", () => {
     // A cold start in the inbound view is otherwise the same picture as one in
     // the authored view.
-    const cold = plain(header([], opts({ fetchedAt: null })));
-    expect(cold).toContain("inbound");
-    expect(plain(header([], opts({ fetchedAt: null, view: "authored" }))))
+    expect(summary(header([], opts({ fetchedAt: null })))).toContain("inbound");
+    expect(summary(header([], opts({ fetchedAt: null, view: "authored" }))))
       .not.toContain("inbound");
   });
 
-  test("the authored view is untouched", () => {
-    const text = plain(header(list.rows, opts({ view: "authored" })));
+  test("the authored summary is untouched", () => {
+    const text = summary(header(list.rows, opts({ view: "authored" })));
     expect(text).toContain("open");
     expect(text).not.toContain("inbound");
+  });
+});
+
+describe("the view switcher", () => {
+  test("says what it does, in both views — the pane title names the view", () => {
+    expect(plain(header(list.rows, opts({ cols: 60 })))).toContain(" · toggle view · ");
+    expect(plain(header(list.rows, opts({ cols: 60, view: "authored" }))))
+      .toContain(" · toggle view · ");
+  });
+
+  test("names the two views on the pane title instead", () => {
+    // The view is named where it costs no columns the list wants. Herdr paints
+    // this on the pane header via `report-metadata --title`.
+    expect(VIEW_TITLE.authored).toBe("My PRs");
+    expect(VIEW_TITLE.inbound).toBe("Awaiting Review");
+  });
+
+  test("sits between what the pane is showing and how old it is", () => {
+    // The count says what you are looking at and the age says whether to trust
+    // it; the control to change the first belongs next to it, not in front.
+    expect(plain(header(list.rows, opts()))).toMatch(/inbound · toggle view · \d+s ago$/);
+  });
+
+  test("carries the URL its link handler matches", () => {
+    expect(header(list.rows, opts())).toContain(viewUrl("authored"));
+    expect(header(list.rows, opts({ view: "authored" }))).toContain(viewUrl("inbound"));
+  });
+
+  test("points at a list a plain click can open", () => {
+    // The pane acts on the plain click itself, but it cannot guarantee it owns
+    // every click on its own links: anywhere the capture does not apply the URL
+    // is simply opened, so it has to be somewhere worth landing rather than a
+    // private scheme nothing can open.
+    for (const view of ["authored", "inbound"] as const) {
+      expect(viewUrl(view)).toStartWith("https://github.com/");
+    }
+  });
+
+  test("shortens before it disappears", () => {
+    // A pane too narrow for "toggle view" keeps a control that says less. The
+    // labels are offered longest-first, so this is the middle of the ladder.
+    const line = plain(header(list.rows, opts({ cols: 34 })));
+    expect(line).toContain(" · toggle");
+    expect(line).not.toContain("toggle view");
+    expect(width(line)).toBeLessThanOrEqual(34);
+
+    // And narrower still, the glyph — a control at every width the pane has.
+    const tighter = plain(header(list.rows, opts({ cols: 30 })));
+    expect(tighter).toContain(" · ⇄");
+    expect(width(tighter)).toBeLessThanOrEqual(30);
+  });
+
+  test("is dropped rather than clipping the summary", () => {
+    // The summary is what the line exists to say. A pane too narrow to hold
+    // even the shortest label loses the control, not the count or the age.
+    const narrow = plain(header(list.rows, opts({ cols: 24 })));
+    for (const label of SWITCHER_LABELS) expect(narrow).not.toContain(label);
+    expect(narrow).toContain("5 inbound");
+    expect(narrow).toContain("ago");
+    expect(width(narrow)).toBeLessThanOrEqual(24);
+  });
+
+  test("never clips its own label, at any width", () => {
+    // A label is offered whole or not at all: half a control says nothing.
+    for (let cols = 10; cols <= 60; cols++) {
+      const line = plain(header(list.rows, opts({ cols })));
+      expect(width(line)).toBeLessThanOrEqual(cols);
+      const worn = SWITCHER_LABELS.find((l) => line.includes(l));
+      if (worn) expect(line).toContain(` · ${worn}`);
+    }
+  });
+
+  test("is offered before the first fetch, where the timer will be", () => {
+    // A cold start has no age for it to sit in front of, so it goes last.
+    expect(plain(header([], opts({ cols: 60, fetchedAt: null })))).toEndWith(" · toggle view");
   });
 });
 
