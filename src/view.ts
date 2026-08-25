@@ -121,7 +121,7 @@ export function viewUrl(view: View): string {
  *
  * `pattern` is a **Rust regular expression**, not a glob and not a literal, so
  * the dots are escaped and both ends are anchored: unanchored, these would also
- * match a longer URL that merely contains one of them. `tests/manifest.ts`
+ * match a longer URL that merely contains one of them. `tests/manifest.test.ts`
  * checks the manifest's own pattern against `viewUrl` rather than against this
  * — a copy that agreed with itself and not with the manifest would prove
  * nothing.

@@ -97,7 +97,7 @@ export async function setToken(paneId: string, name: string, value: string): Pro
  * matches the widget on: a title that changed with the view would make the
  * widget unrecognisable in one of them, and the only symptom is orphan panes
  * quietly accumulating. The metadata title is display-only and leaves `label`
- * alone — probed 2026-08-25, `pane list` reports the two independently.
+ * alone — probed: `pane list` reports the two independently.
  */
 export async function setPaneTitle(paneId: string, title: string): Promise<void> {
   await call([

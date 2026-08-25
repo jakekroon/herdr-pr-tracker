@@ -48,7 +48,7 @@ export async function writeSnapshot(s: Snapshot, view: View = DEFAULT_VIEW): Pro
     // truncated file that reads as "no open PRs" on the next start.
     //
     // `renameSync`, and deliberately not `Bun.write(path, Bun.file(tmp))`:
-    // probed 2026-08-25, that copies onto the destination's *existing inode*
+    // probed — that copies onto the destination's *existing inode*
     // rather than renaming — the destination is truncated in place, which is
     // exactly the window this is meant to close. Nothing in Bun's write API
     // renames, so the atomic step comes from `node:fs`.

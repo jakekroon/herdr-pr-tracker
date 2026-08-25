@@ -2,7 +2,7 @@
 //
 // Herdr resolves an OSC 8 click itself and opens the browser, which is why the
 // pane used to leave the mouse alone. It cannot any more: on iTerm2 — measured,
-// 2026-08-25 — a ctrl-click never reaches the terminal as a modified left click
+// not assumed — a ctrl-click never reaches the terminal as a modified left click
 // (macOS claims it as the secondary click) and a cmd-click arrives carrying the
 // *meta* bit, indistinguishable from Option. Herdr's `[[link_handlers]]` route
 // is keyed to ctrl-click, so it is unreachable there, and the plain click is

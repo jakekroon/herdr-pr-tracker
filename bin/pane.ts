@@ -113,9 +113,9 @@ function paint() {
  * Which pane this process is drawing into, as of now.
  *
  * `HERDR_PANE_ID` is the id the process was *launched* with, and a cross-tab
- * move renames the pane without restarting or notifying the renderer — probed
- * 2026-08-25, a live widget's env said `w23:p1` while the pane was `w23:pX`. So
- * the env var is only the last resort. The recorded id is checked against a
+ * move renames the pane without restarting or notifying the renderer — probed:
+ * a live widget's env said `w23:p1` while the pane was `w23:pX`. So the env var
+ * is only the last resort. The recorded id is checked against a
  * live listing first, and the label is the fallback: it is the same
  * discriminator `adoptWidget` uses, and `follow` keeps exactly one pane wearing
  * it.
