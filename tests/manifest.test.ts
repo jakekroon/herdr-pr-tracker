@@ -10,6 +10,7 @@ import { VIEWS, viewUrl } from "../src/view.ts";
 
 const manifest = Bun.TOML.parse(await Bun.file("herdr-plugin.toml").text()) as {
   id?: string;
+  version?: string;
   panes?: Array<{ id?: string; title?: string; command?: string[] }>;
   events?: Array<{ on?: string; command?: string[] }>;
   actions?: Array<{ id?: string; command?: string[] }>;
@@ -19,6 +20,17 @@ const manifest = Bun.TOML.parse(await Bun.file("herdr-plugin.toml").text()) as {
 
 const problems: string[] = [];
 if (manifest.id !== "herdr-pr-tracker") problems.push(`unexpected id ${manifest.id}`);
+
+// The version is written twice and Herdr only ever reads one of them: `plugin
+// list` and the install preview both report the manifest's. A bumped
+// `package.json` with a stale manifest therefore ships a release that *names
+// itself the previous version* on every machine that installs it, and nothing
+// in the plugin would say otherwise.
+const pkgVersion = (JSON.parse(await Bun.file("package.json").text()) as { version?: string })
+  .version;
+if (manifest.version !== pkgVersion) {
+  problems.push(`version mismatch: manifest ${manifest.version} vs package.json ${pkgVersion}`);
+}
 
 const commands = [
   ...(manifest.panes ?? []),

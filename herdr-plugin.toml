@@ -1,6 +1,6 @@
 id = "herdr-pr-tracker"
 name = "PR Tracker"
-version = "0.1.0"
+version = "0.1.1"
 min_herdr_version = "0.8.0"
 description = "Every open pull request you have authored, docked and colour-coded by what needs you."
 platforms = ["macos", "linux"]
