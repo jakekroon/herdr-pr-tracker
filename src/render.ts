@@ -34,6 +34,7 @@ const FG: Record<string, string> = {
 /** A clean, ready-for-review PR is deliberately uncoloured: if every row is
  * coloured, the colour tells you nothing. */
 export const SIGNAL_COLOUR: Record<Signal, keyof typeof FG> = {
+  conflict: "red",
   "changes-requested": "red",
   "checks-failed": "red",
   unresolved: "yellow",
@@ -50,8 +51,18 @@ export const SIGNAL_COLOUR: Record<Signal, keyof typeof FG> = {
  * user's theme and must not grow, but "a human asked for changes" and "CI is
  * red" should still separate themselves from the merely yellow rows at a
  * glance. It is also what the header counts as needing you.
+ *
+ * In precedence order, because `repoHeader` takes the first hit as the group's
+ * loudest. `conflict` is the purest case of what this list selects for: nobody
+ * else can resolve it and nothing else about the pull request can proceed
+ * until somebody does.
  */
-export const LOUD: Signal[] = ["changes-requested", "checks-failed", "unresolved"];
+export const LOUD: Signal[] = [
+  "conflict",
+  "changes-requested",
+  "checks-failed",
+  "unresolved",
+];
 
 // CI glyphs are inherited verbatim from the gh-pr plugin this replaces, so the
 // two surfaces never disagree about what ✓ means while both are installed.
@@ -67,6 +78,13 @@ const REVIEW_GLYPH: Record<Exclude<ReviewDecision, null>, string> = {
   CHANGES_REQUESTED: "✗",
   REVIEW_REQUIRED: "◆",
 };
+
+/** The head cannot be merged into the base without a manual resolution.
+ * Circle-based like `◌`/`◦`/`◆` rather than another cross: `✗` already means
+ * two different things in this cluster (a review and a build), and a third
+ * would make the column the only thing telling them apart. `⇄` was unavailable
+ * — the narrow switcher label already owns it. */
+export const CONFLICT_GLYPH = "⊘";
 
 /** Marks a PR that has a live Herdr workspace open on its branch. */
 export const LINKED_GLYPH = "▪";
@@ -252,8 +270,16 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
   const flagCell = flag.padEnd(4, " ");
   const reviewCell = row.review ? REVIEW_GLYPH[row.review] : " ";
   const ciCell = CI_GLYPH[row.ci];
+  // Reserved on every row whether or not it conflicts, so the cluster keeps
+  // aligning down the pane — the same trade the band's count cell makes. It
+  // costs one column of branch name on every row in both views, which is what
+  // alignment is worth here. Leftmost rather than at the pane edge: the review
+  // and CI cells have held the last two columns since the plugin this one
+  // replaces, and moving what lives at the edge would cost more than the
+  // column does.
+  const conflictCell = row.conflict ? CONFLICT_GLYPH : " ";
 
-  const plain = `${reviewCell} ${flagCell}${ciCell}`;
+  const plain = `${conflictCell}${reviewCell} ${flagCell}${ciCell}`;
   if (!colour) return { plain, painted: plain };
 
   const reviewColour: keyof typeof FG = row.review === "APPROVED"
@@ -271,9 +297,12 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
     ? "blue"
     : "default";
 
-  // An empty flag cell stays unpainted: wrapping four spaces in colour codes
-  // makes a clean row carry escapes that say nothing.
-  const painted = `${paint(reviewCell, reviewColour, true)} ` +
+  // Cells that are empty stay unpainted: wrapping blank columns in colour codes
+  // makes a clean row carry escapes that say nothing. That is why the flag cell
+  // is painted conditionally below, and why the conflict cell asks for
+  // "default" — `paint` returns an uncoloured string unwrapped.
+  const painted = `${paint(conflictCell, row.conflict ? "red" : "default", true)}` +
+    `${paint(reviewCell, reviewColour, true)} ` +
     `${flag ? paint(flagCell, "yellow", true) : flagCell}` +
     `${paint(ciCell, ciColour, true)}`;
   return { plain, painted };
@@ -379,9 +408,11 @@ export function header(rows: PrRow[], o: RenderOpts): string {
   const age = o.now - o.fetchedAt;
   const stale = age > o.pollSeconds * 2000;
 
-  // Counted from the headline signal, which is safe because the three loud
-  // signals are also the top three of the precedence order: a row carrying one
-  // of them can never have something else as its headline.
+  // Counted from the headline signal, which is safe because the four loud
+  // signals are also the top four of the precedence order: a row carrying one
+  // of them can never have something else as its headline. tests/render.test.ts
+  // asserts that prefix, because this count is silently wrong the moment LOUD
+  // and PRECEDENCE disagree.
   const total = rows.length + (o.omitted ?? 0);
   // The inbound view names itself, because an empty list is otherwise the same
   // picture in both views, and drops the needs-you count: every row in it needs

@@ -21,7 +21,7 @@ platform ───────────────────────�
 web-app ────────────────────────────────── 1
    fix/payload-fields                      ✓
     #12760 Trim the payload to the field… 4d
-▪  chore/importer-dry-run              ⚑1  ✓
+▪  chore/importer-dry-run           ⊘  ⚑1  ✓
     #4417 Give the importer a dry-run mo… 4d
 
 metrics-service ──────────────────────────
@@ -40,6 +40,7 @@ opens in your browser.
 
 | Mark | Meaning | Colour |
 |---|---|---|
+| `⊘` | Cannot be merged without resolving a conflict | red |
 | `✗` in the review column | Changes requested | red |
 | `✗` in the check column | Checks failing | red |
 | `⚑N` | `N` unresolved review threads | yellow |
@@ -48,7 +49,7 @@ opens in your browser.
 | `✓` in the review column | Approved | green |
 | `✓` in the check column | Checks passing | green |
 | `◌` | Draft — dims the whole row | dim |
-| **bold** branch | *My PRs only* — changes requested, failing checks or unresolved threads: the three that are yours to act on | — |
+| **bold** branch | *My PRs only* — a conflict, changes requested, failing checks or unresolved threads: the four that are yours to act on | — |
 | `▪` | A Herdr workspace is open on this branch | dim |
 | `◦` | *Awaiting Review only* — you are in the conversation but nobody asked you | plain |
 | `N` at the end of a repository rule | *My PRs only* — how many of that repository's pull requests need you | the loudest of them |
@@ -56,17 +57,30 @@ opens in your browser.
 
 A pull request can carry several of these at once, so each is drawn separately —
 nothing is hidden by something louder. The row's own colour is the loudest one it
-carries, in this order: changes requested, failing checks, unresolved threads,
-review required, checks running, approved, clean.
+carries, in this order: conflict, changes requested, failing checks, unresolved
+threads, review required, checks running, approved, clean.
 
 Some deliberate choices worth knowing:
 
 - **A clean pull request is uncoloured.** If every row is coloured, the colour
   tells you nothing.
-- **Emphasis is a second axis, not a seventh colour.** The palette is your Herdr
-  theme's own sixteen and does not grow, so the three signals that are *your*
-  work — changes requested, failing checks, unresolved threads — take bold as
-  well as colour. They are also what the header counts as needing you.
+- **Emphasis is a second axis, not an eighth colour.** The palette is your Herdr
+  theme's own sixteen and does not grow, so the four signals that are *your*
+  work — a conflict, changes requested, failing checks, unresolved threads —
+  take bold as well as colour. They are also what the header counts as needing
+  you.
+- **A conflict leads, and it is the one signal that leads both views.** Nobody
+  else can resolve it, and nothing else about the pull request can proceed until
+  somebody does — a review and a green build are both answers to a question the
+  branch cannot yet ask. Its column is reserved on every row so the cluster
+  keeps aligning down the pane, which costs every branch name one column.
+- **A conflict GitHub has not computed yet shows nothing.** Mergeability is
+  worked out lazily, so a pull request opened seconds ago reports neither
+  answer, and that is drawn as silence rather than as a branch that will merge.
+  The cost is that a conflict can appear one poll after the row does. Being
+  *behind* the base branch is deliberately not tracked at all — the only field
+  that reports it reports one merge state at a time, so the answer would go
+  missing on exactly the pull requests that are also blocked on something else.
 - **A cancelled check is not a failure.** A cancelled run is nearly always one
   you superseded, and colouring it red teaches you to ignore red.
 - **Checks still running are blue, not green.** "CI is still thinking" is the
@@ -137,10 +151,13 @@ reason — the work is somebody else's:
 - **`◦` marks a row nobody asked you to look at** — you were assigned,
   mentioned, or you left a comment. A row with no mark is one where your review
   was actually requested, which is the ordinary reason to be here.
-- **The colour order nearly inverts** — the same seven signals, ranked again:
-  review required, checks running, clean, unresolved threads, failing checks,
-  approved, changes requested. *Review required* leads, because it is the point
-  of the view. *Changes requested* comes last, because it is usually your own
+- **The colour order nearly inverts below the first place** — the same eight
+  signals, ranked again: conflict, review required, checks running, clean,
+  unresolved threads, failing checks, approved, changes requested. *Conflict*
+  still leads, and it is the only signal that leads both views: to a reviewer a
+  conflicting pull request is not *reviewable*, so "do not read this yet" is the
+  loudest thing the row can say. *Review required* leads the rest, because it is
+  the point of the view. *Changes requested* comes last, because it is usually your own
   verdict already delivered. Failing checks and unresolved threads sit low for
   the same reason: they are the author's job, and a red pull request is one it
   is too early to read.
@@ -288,10 +305,11 @@ settings of before you can read it.
 One `gh api graphql` request per poll fetches every pull request and everything
 about it. Rate-limit cost is charged per `search` field rather than per pull
 request, so the authored view costs the same whatever comes back and the inbound
-view — three searches aliased into one document — costs proportionally more; both
-are a rounding error against the 5000/hour budget at the default 60-second poll.
-Every response carries `rateLimit { cost remaining }` if you want the real
-number. Unresolved review threads are the reason it is GraphQL and not
+view — three searches aliased into one document — costs proportionally more.
+Measured: **5 points for the authored view and 15 for the inbound one**, which at
+the default 60-second poll is a rounding error against the 5000/hour budget.
+Every response carries `rateLimit { cost remaining }`, so you can always check
+rather than trust this paragraph. Unresolved review threads are the reason it is GraphQL and not
 `gh pr list`: `isResolved` exists nowhere else.
 
 Herdr has no background-poll mechanism for plugins, so the poll loop lives in the

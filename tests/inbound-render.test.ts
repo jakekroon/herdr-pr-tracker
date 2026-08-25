@@ -123,7 +123,7 @@ describe("the view switcher", () => {
     // even the shortest label loses the control, not the count or the age.
     const narrow = plain(header(list.rows, opts({ cols: 24 })));
     for (const label of SWITCHER_LABELS) expect(narrow).not.toContain(label);
-    expect(narrow).toContain("5 inbound");
+    expect(narrow).toContain("6 inbound");
     expect(narrow).toContain("ago");
     expect(width(narrow)).toBeLessThanOrEqual(24);
   });

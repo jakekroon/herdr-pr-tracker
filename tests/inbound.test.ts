@@ -18,7 +18,7 @@ const by = (n: number): PrRow => {
 
 describe("parseInbound", () => {
   test("collects the union of the three searches once each", () => {
-    expect(list.rows.map((r) => r.number).sort()).toEqual([101, 102, 103, 104, 105]);
+    expect(list.rows.map((r) => r.number).sort()).toEqual([101, 102, 103, 104, 105, 106]);
   });
 
   test("a pull request in two searches is one row, not two", () => {
@@ -45,7 +45,7 @@ describe("parseInbound", () => {
     // The inbound list accumulates — it does not empty by being worked — so the
     // oldest rows are the ones already reviewed or merely commented on, and
     // pushing the freshest requests off the bottom is the failure to avoid.
-    expect(list.rows.map((r) => r.number)).toEqual([104, 103, 101, 102, 105]);
+    expect(list.rows.map((r) => r.number)).toEqual([104, 103, 101, 106, 102, 105]);
   });
 
   test("carries the author, which the inbound identity line needs", () => {
@@ -56,7 +56,7 @@ describe("parseInbound", () => {
   test("caps the union and reports what it dropped as omitted", () => {
     const capped = parseInbound(fixture, 100, 3);
     expect(capped.rows.map((r) => r.number)).toEqual([104, 103, 101]);
-    expect(capped.omitted).toBe(2);
+    expect(capped.omitted).toBe(3);
   });
 
   test("an empty response is an empty list, not a crash", () => {
@@ -66,12 +66,30 @@ describe("parseInbound", () => {
 });
 
 describe("inbound precedence", () => {
+  test("a conflict owns an inbound row over the review it was asked for", () => {
+    const row = by(106);
+    expect(row.conflict).toBe(true);
+    expect(row.review).toBe("REVIEW_REQUIRED");
+    expect(row.reason).toBe("reviewer");
+    // Both signals are still carried — re-ranking hides nothing — but the
+    // conflict is the one that colours the row.
+    expect(signalsFor(row, "inbound")).toEqual(["conflict", "review-required"]);
+    expect(headline(row, "inbound")).toBe("conflict");
+  });
+
   test("ranks the same signals as the authored order, never a different set", () => {
     expect([...INBOUND_PRECEDENCE].sort()).toEqual([...PRECEDENCE].sort());
   });
 
-  test("review required is loudest, because it is the point of the view", () => {
-    expect(INBOUND_PRECEDENCE[0]).toBe("review-required");
+  test("a conflict leads both orders — not reviewable outranks not reviewed", () => {
+    // Why, in CONTEXT.md and docs/adr/0004 — not restated here, where it would
+    // be the copy that drifts.
+    expect(INBOUND_PRECEDENCE[0]).toBe("conflict");
+    expect(PRECEDENCE[0]).toBe("conflict");
+  });
+
+  test("review required is loudest of the rest, because it is the point of the view", () => {
+    expect(INBOUND_PRECEDENCE[1]).toBe("review-required");
   });
 
   test("changes requested is quietest, because it is usually your own verdict", () => {

@@ -80,6 +80,44 @@ describe("signals and precedence", () => {
     expect(signalsFor(row)).toEqual(["checks-failed", "approved"]);
   });
 
+  test("a conflict leads the authored order, over a human's ask", () => {
+    // The decision this branch turns on: a conflict is resolved before
+    // anything else about the pull request matters, so it outranks the signal
+    // that led the order until now.
+    const row = byNumber(121);
+    expect(row.conflict).toBe(true);
+    expect(signalsFor(row)).toEqual([
+      "conflict",
+      "changes-requested",
+      "checks-failed",
+    ]);
+    expect(headline(row)).toBe("conflict");
+    expect(PRECEDENCE[0]).toBe("conflict");
+  });
+
+  test("a conflict on an otherwise silent PR is the only signal", () => {
+    expect(signalsFor(byNumber(119))).toEqual(["conflict"]);
+  });
+
+  test("a conflicting draft still carries the conflict", () => {
+    const row = byNumber(120);
+    expect(row.isDraft).toBe(true);
+    expect(signalsFor(row)).toEqual(["conflict"]);
+  });
+
+  test.each([
+    ["UNKNOWN, not yet computed", 122],
+    ["MERGEABLE", 123],
+    ["absent from the response", 112],
+  ])("%s is not a conflict", (_label, number) => {
+    // UNKNOWN is no news. It must never render as a conflict, and equally
+    // never as a confirmed mergeable: the widget does not claim a branch will
+    // merge on the strength of GitHub not having looked yet.
+    const row = byNumber(number as number);
+    expect(row.conflict).toBe(false);
+    expect(signalsFor(row)).not.toContain("conflict");
+  });
+
   test("signals are always ordered by PRECEDENCE", () => {
     for (const row of parseSearch(states).rows) {
       const idx = signalsFor(row).map((s) => PRECEDENCE.indexOf(s));

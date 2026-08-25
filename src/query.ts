@@ -29,6 +29,7 @@ const PR_FIELDS = `
         url
         isDraft
         createdAt
+        mergeable
         headRefName
         reviewDecision
         reviewRequests(first: 1) { totalCount }
