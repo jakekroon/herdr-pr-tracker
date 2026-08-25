@@ -60,3 +60,22 @@ title = "Toggle the PR pane"
 description = "Show or hide the PR list widget"
 contexts = ["global"]
 command = ["bun", "bin/toggle.ts"]
+
+# The two view actions. Idempotent rather than one toggle, so each title is a
+# promise about what you will be looking at and either can be bound to a key
+# without your knowing which view you are in. Both write the preference and let
+# the pane process pick it up: it owns the poll loop, and two processes fetching
+# would race.
+[[actions]]
+id = "view-authored"
+title = "Show my PRs"
+description = "List the pull requests you opened"
+contexts = ["global"]
+command = ["bun", "bin/view.ts", "authored"]
+
+[[actions]]
+id = "view-inbound"
+title = "Show PRs to review"
+description = "List the pull requests waiting on your review"
+contexts = ["global"]
+command = ["bun", "bin/view.ts", "inbound"]

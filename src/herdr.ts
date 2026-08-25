@@ -172,3 +172,20 @@ export async function resizePane(
     "--amount", String(amount),
   ]);
 }
+
+/**
+ * Converge on having a widget on screen.
+ *
+ * `follow` is the single place that knows where the widget belongs and is
+ * idempotent — it opens one if there is none and early-exits if there is — so
+ * every entrypoint that owes the user a visible pane goes through here rather
+ * than reimplementing the spawn.
+ */
+export async function openWidget(): Promise<number> {
+  const root = process.env.HERDR_PLUGIN_ROOT ?? ".";
+  const p = Bun.spawn(["bun", `${root}/bin/follow.ts`], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return await p.exited;
+}

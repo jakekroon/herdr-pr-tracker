@@ -7,6 +7,10 @@ right of whatever tab you are looking at.
 It answers one question: *what is the state of everything I have open?* — and it
 only tracks. It never opens, closes, merges or comments on anything.
 
+It has a second view, for the other half of the same problem: the pull requests
+**waiting on you** as a reviewer. One pane, one view at a time — see
+[Two views](#two-views).
+
 ```
    5 open · 2 need you · 12s ago
 platform-infra-tools ───────────────────────
@@ -45,6 +49,7 @@ opens in your browser.
 | `◌` | Draft — dims the whole row | dim |
 | **bold** branch | Changes requested, failing checks or unresolved threads — the three that are yours to act on | — |
 | `▪` | A Herdr workspace is open on this branch | dim |
+| `◦` | *Inbound view only* — you are in the conversation but nobody asked you | plain |
 | *nothing* | Ready for review, nothing to do | plain |
 
 A pull request can carry several of these at once, so each is drawn separately —
@@ -82,6 +87,55 @@ dropped**: the title line goes and its hyperlink moves onto the branch, so a
 squeezed pane still shows every pull request, its signals and its link. Only when
 even that overflows are rows dropped, and then the *oldest* go, with a `… +N
 older` row at the top — your newest work is never what falls off the end.
+
+## Two views
+
+The pane lists one of two things, and you switch between them from the Herdr
+action palette:
+
+| Action | Shows |
+|---|---|
+| **Show my PRs** | The pull requests you opened. The default. |
+| **Show PRs to review** | The pull requests waiting on you: your review was asked for, you have already given one, or you are in the conversation. |
+
+```
+    3 inbound · 12s ago
+
+platform ─────────────────────────────────
+    priya chore/toolchain                  ●
+     #104 Bump the pinned toolchain       2d
+  ◦ wren chore/seeds                       ✓
+     #105 Tidy the seed script           10d
+
+web-app ──────────────────────────────────
+    priya fix/webhook-retry          ◆     ✗
+     #101 Retry the webhook dispatcher o… 5d
+```
+
+The inbound view is the same widget with three things changed, all for the same
+reason — the work is somebody else's:
+
+- **Rows lead with the author**, not the branch. The branch follows it when
+  there are columns spare. Your own branch names are how you think about your
+  own work; somebody else's are not.
+- **`◦` marks a row nobody asked you to look at** — you were assigned,
+  mentioned, or you left a comment. A row with no mark is one where your review
+  was actually requested, which is the ordinary reason to be here.
+- **The colour order nearly inverts.** *Review required* leads, because it is
+  the point of the view. *Changes requested* comes last, because it is usually
+  your own verdict already delivered. Failing checks and unresolved threads sit
+  in between: they are the author's job, and a red pull request is one it is too
+  early to read.
+
+There is no needs-you count, because every row in the view needs you. Ordering
+is **newest first** here, the opposite of the authored view, and for a specific
+reason: GitHub drops a review request the moment you review, so this view folds
+in what you have *already* reviewed to let you watch what happens next — which
+means the list does not empty by being worked. Its oldest rows are the ones you
+have already dealt with, so those are what falls off the end.
+
+The chosen view is remembered across restarts. Each view caches its own list, so
+reopening the pane never shows one view's rows under the other one's heading.
 
 ## The sidebar token
 
@@ -126,7 +180,21 @@ key = "prefix+i"
 type = "plugin_action"
 command = "herdr-pr-tracker.refresh"
 description = "refresh PR status"
+
+[[keys.command]]
+key = "prefix+m"
+type = "plugin_action"
+command = "herdr-pr-tracker.view-authored"
+description = "show my PRs"
+
+[[keys.command]]
+key = "prefix+n"
+type = "plugin_action"
+command = "herdr-pr-tracker.view-inbound"
+description = "show PRs to review"
 ```
+
+Both view actions open the pane if it is closed, so neither needs `toggle` first.
 
 Avoid `alt+` chords (they emit characters in the terminal), and pick keys that do
 not collide with the built-ins: `o`, `g`, `r`, `v` and `e` are taken.
@@ -137,9 +205,12 @@ Optional. `cp config.example config`, or drop a `config` in
 `herdr plugin config-dir herdr-pr-tracker` — the plugin config dir is read second
 and wins. Every setting is documented in `config.example`.
 
-The one worth knowing about is `SEARCH_QUERY`: it is the whole definition of what
-gets tracked, so pointing it at `is:pr is:open review-requested:@me` turns the
-widget into an inbox of other people's pull requests instead.
+The one worth knowing about is `SEARCH_QUERY`: it is the whole definition of the
+**authored** view, so pointing it somewhere else re-aims that view entirely.
+
+It deliberately does not reach the inbound view. That view's three searches are
+what tell a row you were *asked* from a row you are merely *involved* in, and an
+override would change what `◦` means with no way for you to notice.
 
 Glyphs, colours, precedence and sort order are deliberately **not** configurable.
 A widget whose meaning depends on settings is a widget you have to remember the
@@ -170,7 +241,7 @@ Herdr for the title hyperlinks to work.
 ## Development
 
 ```bash
-bun test        # 194 tests: no network, no gh, no Herdr
+bun test        # 250 tests: no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
 

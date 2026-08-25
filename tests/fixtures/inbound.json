@@ -1,0 +1,336 @@
+{
+  "data": {
+    "requested": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "number": 101,
+          "title": "Retry the webhook dispatcher on 5xx",
+          "url": "https://github.com/acme/web-app/pull/101",
+          "isDraft": false,
+          "createdAt": "2026-08-20T09:00:00Z",
+          "headRefName": "fix/webhook-retry",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "author": {
+            "login": "priya"
+          },
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 102,
+          "title": "Split the billing reconciler into two passes",
+          "url": "https://github.com/acme/web-app/pull/102",
+          "isDraft": false,
+          "createdAt": "2026-08-18T09:00:00Z",
+          "headRefName": "refactor/reconciler",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "author": {
+            "login": "dmitri"
+          },
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "reviewed": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "number": 103,
+          "title": "Document the cache eviction policy",
+          "url": "https://github.com/acme/platform/pull/103",
+          "isDraft": false,
+          "createdAt": "2026-08-22T09:00:00Z",
+          "headRefName": "docs/eviction",
+          "reviewDecision": "APPROVED",
+          "author": {
+            "login": "sam"
+          },
+          "repository": {
+            "name": "platform",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 104,
+          "title": "Bump the pinned toolchain",
+          "url": "https://github.com/acme/platform/pull/104",
+          "isDraft": false,
+          "createdAt": "2026-08-23T09:00:00Z",
+          "headRefName": "chore/toolchain",
+          "reviewDecision": null,
+          "author": {
+            "login": "priya"
+          },
+          "repository": {
+            "name": "platform",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": null,
+                          "status": "IN_PROGRESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "involved": {
+      "issueCount": 3,
+      "nodes": [
+        {
+          "number": 102,
+          "title": "Split the billing reconciler into two passes",
+          "url": "https://github.com/acme/web-app/pull/102",
+          "isDraft": false,
+          "createdAt": "2026-08-18T09:00:00Z",
+          "headRefName": "refactor/reconciler",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "author": {
+            "login": "dmitri"
+          },
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "isResolved": false
+              },
+              {
+                "isResolved": false
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 104,
+          "title": "Bump the pinned toolchain",
+          "url": "https://github.com/acme/platform/pull/104",
+          "isDraft": false,
+          "createdAt": "2026-08-23T09:00:00Z",
+          "headRefName": "chore/toolchain",
+          "reviewDecision": null,
+          "author": {
+            "login": "priya"
+          },
+          "repository": {
+            "name": "platform",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": null,
+                          "status": "IN_PROGRESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 105,
+          "title": "Tidy the seed script",
+          "url": "https://github.com/acme/platform/pull/105",
+          "isDraft": false,
+          "createdAt": "2026-08-15T09:00:00Z",
+          "headRefName": "chore/seeds",
+          "reviewDecision": null,
+          "author": {
+            "login": "wren"
+          },
+          "repository": {
+            "name": "platform",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "cost": 3,
+      "remaining": 4997
+    }
+  }
+}

@@ -1,6 +1,7 @@
 // The manifest is the plugin's contract with Herdr: a typo in a command path
 // or an action id fails at runtime, in a hook, where nobody is watching.
 import { existsSync } from "node:fs";
+import { isView } from "../src/view.ts";
 
 const manifest = Bun.TOML.parse(await Bun.file("herdr-plugin.toml").text()) as {
   id?: string;
@@ -45,6 +46,21 @@ if (!widgetLabel || widgetLabel !== declaredTitle) {
   problems.push(
     `follow adopts panes labelled "${widgetLabel}", but the manifest titles "${entrypoint}" as "${declaredTitle}"`,
   );
+}
+
+// The view actions carry the view name as a command argument, so a typo there
+// is a packaging bug that only shows up when somebody runs the action. Both
+// views must be reachable: shipping only one leaves no way back.
+const viewActions = (manifest.actions ?? []).filter((a) =>
+  (a.command ?? [])[1] === "bin/view.ts"
+);
+const offered = new Set(viewActions.map((a) => (a.command ?? [])[2]));
+for (const a of viewActions) {
+  const arg = (a.command ?? [])[2];
+  if (!isView(arg)) problems.push(`action ${a.id} passes unknown view "${arg}"`);
+}
+for (const v of ["authored", "inbound"]) {
+  if (!offered.has(v)) problems.push(`no action switches to the ${v} view`);
 }
 
 if (problems.length > 0) {

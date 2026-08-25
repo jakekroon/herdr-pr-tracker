@@ -7,12 +7,13 @@
 
 import { dirname, join } from "node:path";
 import { loadConfig } from "../src/config.ts";
-import { fetchPrs, GhError } from "../src/gh.ts";
+import { fetchInbound, fetchPrs, GhError } from "../src/gh.ts";
 import { listWorkspaces } from "../src/herdr.ts";
 import type { PrRow } from "../src/model.ts";
 import { needsOwner } from "../src/model.ts";
 import { render } from "../src/render.ts";
-import { readSnapshot, stateDir, writeSnapshot } from "../src/state.ts";
+import { readSnapshot, readView, stateDir, writeSnapshot } from "../src/state.ts";
+import type { View } from "../src/view.ts";
 import { collectOpenBranches, linkRows } from "../src/workspaces.ts";
 
 const PLUGIN_ROOT = process.env.HERDR_PLUGIN_ROOT ?? dirname(import.meta.dir);
@@ -28,6 +29,10 @@ let rows: PrRow[] = [];
 let omitted = 0;
 let fetchedAt: number | null = null;
 let error: string | null = null;
+// Which pull requests the pane is listing. Persisted, so the pane comes back in
+// the view it was left in; re-read each tick because the two view actions write
+// it from another process.
+let view: View = await readView();
 
 // --- terminal ---------------------------------------------------------------
 
@@ -66,6 +71,7 @@ function paint() {
     error,
     pollSeconds: cfg.pollSeconds,
     colour: cfg.colour,
+    view,
     // `auto` spends the ten columns on an owner prefix only once a second
     // owner is actually present.
     showOwner: cfg.showOwner === "always" ||
@@ -81,7 +87,11 @@ function paint() {
 
 async function refresh() {
   try {
-    const list = await fetchPrs(cfg.searchQuery, cfg.maxPrs);
+    // The inbound view is deliberately not `fetchPrs` with a different query:
+    // it is three searches and a dedup, and its rows carry a reason.
+    const list = view === "inbound"
+      ? await fetchInbound(cfg.maxPrs)
+      : await fetchPrs(cfg.searchQuery, cfg.maxPrs);
     // Workspace linkage is local and cheap, and a failure to read it must not
     // discard a good PR fetch — so it degrades to "nothing linked".
     let linked = list.rows;
@@ -94,7 +104,7 @@ async function refresh() {
     omitted = list.omitted;
     fetchedAt = Date.now();
     error = null;
-    await writeSnapshot({ fetchedAt, rows, omitted });
+    await writeSnapshot({ fetchedAt, rows, omitted }, view);
   } catch (e) {
     // Keep the last good list on screen. The header turns red and says why,
     // and still reports how old the data actually is: showing stale rows as
@@ -133,7 +143,7 @@ Bun.write(Bun.stdout, ALT_SCREEN_ON);
 
 // Show the cached list immediately, correctly labelled with its true age, so a
 // restarted widget is never a blank pane for a whole poll interval.
-const cached = await readSnapshot();
+const cached = await readSnapshot(view);
 if (cached) {
   rows = cached.rows;
   omitted = cached.omitted;
@@ -157,6 +167,22 @@ while (true) {
     }
   } catch {
     // Nothing to do: a missing or unreadable marker just means no request.
+  }
+
+  // A view action landed. Swap to that view's cached list and repaint before
+  // fetching, so the switch is immediate rather than a pane that keeps showing
+  // the old view until the network answers — and never shows one view's rows
+  // under the other view's heading.
+  const wanted = await readView();
+  if (wanted !== view) {
+    view = wanted;
+    const seen = await readSnapshot(view);
+    rows = seen?.rows ?? [];
+    omitted = seen?.omitted ?? 0;
+    fetchedAt = seen?.fetchedAt ?? null;
+    error = null;
+    paint();
+    forced = true;
   }
 
   if (forced || Date.now() - lastPoll >= cfg.pollSeconds * 1000) {

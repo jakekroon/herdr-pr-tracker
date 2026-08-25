@@ -7,6 +7,7 @@ import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { lockIsStale } from "./dock.ts";
 import type { PrRow } from "./model.ts";
+import { DEFAULT_VIEW, parseView, snapshotFile, type View } from "./view.ts";
 
 export interface Snapshot {
   fetchedAt: number;
@@ -25,11 +26,13 @@ export function stateDir(): string {
   );
 }
 
-const snapshotPath = () => join(stateDir(), "last.json");
+// Keyed by view: one shared file would paint the authored list under the
+// inbound heading for a whole fetch after reopening in the inbound view.
+const snapshotPath = (view: View) => join(stateDir(), snapshotFile(view));
 
-export async function readSnapshot(): Promise<Snapshot | null> {
+export async function readSnapshot(view: View = DEFAULT_VIEW): Promise<Snapshot | null> {
   try {
-    const raw = await Bun.file(snapshotPath()).json();
+    const raw = await Bun.file(snapshotPath(view)).json();
     if (typeof raw?.fetchedAt !== "number" || !Array.isArray(raw?.rows)) return null;
     return { fetchedAt: raw.fetchedAt, rows: raw.rows, omitted: raw.omitted ?? 0 };
   } catch {
@@ -38,8 +41,8 @@ export async function readSnapshot(): Promise<Snapshot | null> {
   }
 }
 
-export async function writeSnapshot(s: Snapshot): Promise<void> {
-  const path = snapshotPath();
+export async function writeSnapshot(s: Snapshot, view: View = DEFAULT_VIEW): Promise<void> {
+  const path = snapshotPath(view);
   try {
     // Write-then-rename so a renderer killed mid-write cannot leave a
     // truncated file that reads as "no open PRs" on the next start.
@@ -50,6 +53,29 @@ export async function writeSnapshot(s: Snapshot): Promise<void> {
   } catch {
     // Caching is a convenience; failing to cache must never break the pane.
   }
+}
+
+/**
+ * The chosen view, persisted so it outlives the pane process.
+ *
+ * The pane owns the poll loop, so the two view actions cannot fetch anything
+ * themselves without racing it — they write here instead and the renderer picks
+ * the change up on its next tick, the same shape as the refresh marker. Unlike
+ * that marker this one is *not* deleted on read: it is a preference, not a
+ * request.
+ */
+export async function readView(): Promise<View> {
+  try {
+    return parseView(await Bun.file(join(stateDir(), "view")).text());
+  } catch {
+    // No marker is the authored view, which is the one the plugin has always
+    // had. Never an error: an unreadable preference must not stop the widget.
+    return DEFAULT_VIEW;
+  }
+}
+
+export async function writeView(view: View): Promise<void> {
+  await Bun.write(join(stateDir(), "view"), `${view}\n`);
 }
 
 /** The single-widget invariant: one pane id, recorded so `follow` moves the
