@@ -3,8 +3,8 @@
 // last-good result, toggling the widget shows an empty pane for a whole poll
 // interval, which is indistinguishable from "you have no open PRs".
 
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { lockIsStale } from "./dock.ts";
 import type { PrRow } from "./model.ts";
 import { DEFAULT_VIEW, parseView, snapshotFile, type View } from "./view.ts";
@@ -170,6 +170,12 @@ export async function takePlacementLock(): Promise<boolean> {
   const path = join(stateDir(), "placing.lock");
   const now = Date.now();
   try {
+    // Every other writer here goes through `Bun.write`, which creates parents;
+    // this one cannot, because "wx" is the atomic part and `Bun.write` has no
+    // exclusive flag. So it has to make the directory itself. Without this, a
+    // checkout Herdr has never run — `bun bin/follow.ts` by hand — ENOENTs on
+    // both writes below and `follow` exits 0 having placed nothing, silently.
+    mkdirSync(dirname(path), { recursive: true });
     // "wx" fails if the file exists, which is the atomic part.
     writeFileSync(path, `${now}\n`, { flag: "wx" });
     return true;
