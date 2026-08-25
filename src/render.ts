@@ -272,14 +272,20 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
   const ciCell = CI_GLYPH[row.ci];
   // Reserved on every row whether or not it conflicts, so the cluster keeps
   // aligning down the pane — the same trade the band's count cell makes. It
-  // costs one column of branch name on every row in both views, which is what
+  // costs two columns of branch name on every row in both views, which is what
   // alignment is worth here. Leftmost rather than at the pane edge: the review
   // and CI cells have held the last two columns since the plugin this one
   // replaces, and moving what lives at the edge would cost more than the
-  // column does.
+  // columns do.
   const conflictCell = row.conflict ? CONFLICT_GLYPH : " ";
 
-  const plain = `${conflictCell}${reviewCell} ${flagCell}${ciCell}`;
+  // Two columns, not one: every other glyph in this cluster is separated from
+  // its neighbour — the review cell by an explicit space, the CI cell by the
+  // flag cell's padding — so a conflict cell butted straight against the review
+  // cell read as one crowded pair beside three evenly spaced ones. The
+  // separator is what makes the cluster scan as a row of cells rather than a
+  // string of glyphs.
+  const plain = `${conflictCell} ${reviewCell} ${flagCell}${ciCell}`;
   if (!colour) return { plain, painted: plain };
 
   const reviewColour: keyof typeof FG = row.review === "APPROVED"
@@ -301,7 +307,7 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
   // makes a clean row carry escapes that say nothing. That is why the flag cell
   // is painted conditionally below, and why the conflict cell asks for
   // "default" — `paint` returns an uncoloured string unwrapped.
-  const painted = `${paint(conflictCell, row.conflict ? "red" : "default", true)}` +
+  const painted = `${paint(conflictCell, row.conflict ? "red" : "default", true)} ` +
     `${paint(reviewCell, reviewColour, true)} ` +
     `${flag ? paint(flagCell, "yellow", true) : flagCell}` +
     `${paint(ciCell, ciColour, true)}`;

@@ -21,7 +21,7 @@ platform ───────────────────────�
 web-app ────────────────────────────────── 1
    fix/payload-fields                      ✓
     #12760 Trim the payload to the field… 4d
-▪  chore/importer-dry-run           ⊘  ⚑1  ✓
+▪  chore/importer-dry-run          ⊘   ⚑1  ✓
     #4417 Give the importer a dry-run mo… 4d
 
 metrics-service ──────────────────────────
@@ -73,7 +73,9 @@ Some deliberate choices worth knowing:
   else can resolve it, and nothing else about the pull request can proceed until
   somebody does — a review and a green build are both answers to a question the
   branch cannot yet ask. Its column is reserved on every row so the cluster
-  keeps aligning down the pane, which costs every branch name one column.
+  keeps aligning down the pane — with a separator column, so the cluster reads
+  as evenly spaced cells rather than a run of glyphs — which costs every branch
+  name two columns.
 - **A conflict GitHub has not computed yet shows nothing.** Mergeability is
   worked out lazily, so a pull request opened seconds ago reports neither
   answer, and that is drawn as silence rather than as a branch that will merge.

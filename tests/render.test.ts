@@ -109,6 +109,18 @@ describe("renderRow", () => {
       .toBe(clean.length - clean.trimEnd().length);
   });
 
+  test("the cluster's glyphs are evenly separated, conflict included", () => {
+    // Every cell is one column with one column between it and its neighbour,
+    // so a row carrying all of them reads as spaced cells rather than as a
+    // run of glyphs jammed together. #121 conflicts, has changes requested and
+    // is failing, so it is the row that carries the most at once.
+    const line = plain(renderRow(pr(121), opts())[0]);
+    const cluster = line.slice(-9);
+    // conflict, separator, review, separator, the four-wide flag cell (empty
+    // here), then CI on the pane edge.
+    expect(cluster).toBe("⊘ ✗     ✗");
+  });
+
   test("LOUD is a prefix of PRECEDENCE, or the needs-you count is wrong", () => {
     // `header` and `repoHeader` both count from a row's *headline*, which is
     // only equivalent to "carries a loud signal" while the loud signals are the
@@ -493,12 +505,12 @@ describe("render", () => {
     const withAge = widths.find((c) => room(c).includes(prAge(row)))!;
     expect(room(withNumber)).not.toContain(prAge(row));
     expect(withAge).toBeGreaterThan(withNumber);
-    // Seven characters, not eight: the conflict cell is reserved on every row,
-    // so at the narrowest width the branch has exactly one column less to
-    // spend than it did before that cell existed. That is the cost the
-    // reserved cell was accepted at, and this is where it is observable.
+    // Six characters, not eight: the conflict cell and its separator are
+    // reserved on every row, so at the narrowest width the branch has two
+    // columns less to spend than it did before that cell existed. That is the
+    // cost the reserved cell was accepted at, and this is where it shows.
     for (const cols of [20, withNumber, withAge, 80]) {
-      expect(room(cols)).toContain(row.branch.slice(0, 7));
+      expect(room(cols)).toContain(row.branch.slice(0, 6));
     }
   });
 
