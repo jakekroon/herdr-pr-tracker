@@ -98,6 +98,48 @@
               }
             ]
           }
+        },
+        {
+          "number": 106,
+          "title": "Split the settings page into tabs",
+          "url": "https://github.com/acme/web-app/pull/106",
+          "isDraft": false,
+          "createdAt": "2026-08-19T11:00:00Z",
+          "headRefName": "feat/settings-tabs",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "CONFLICTING",
+          "author": {
+            "login": "wren"
+          },
+          "repository": {
+            "name": "web-app",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }
       ]
     },

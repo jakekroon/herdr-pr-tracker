@@ -23,6 +23,7 @@ export type CiState = "pass" | "fail" | "pending" | "none";
 /** One artifact worth colouring. Draft is deliberately absent: it is a
  * modifier on the whole row, not a signal competing with these. */
 export type Signal =
+  | "conflict"
   | "changes-requested"
   | "checks-failed"
   | "unresolved"
@@ -32,10 +33,14 @@ export type Signal =
   | "clean";
 
 /** Loudest-first. The headline colour of a row is the first signal it carries.
- * `changes-requested` outranks `checks-failed` because a human asked for
- * changes and CI is a robot; `unresolved` outranks `review-required` because
- * unresolved threads are your work and a pending review is someone else's. */
+ * `conflict` leads: it is resolved before anything else about the pull request
+ * matters, because a review and a green build are both answers to a question
+ * the branch cannot yet ask. Below it, `changes-requested` outranks
+ * `checks-failed` because a human asked for changes and CI is a robot;
+ * `unresolved` outranks `review-required` because unresolved threads are your
+ * work and a pending review is someone else's. */
 export const PRECEDENCE: Signal[] = [
+  "conflict",
   "changes-requested",
   "checks-failed",
   "unresolved",
@@ -47,9 +52,17 @@ export const PRECEDENCE: Signal[] = [
 
 /**
  * The same signals ranked for the inbound view, where the work has changed
- * hands. Very nearly the inverse, and deliberately so:
+ * hands. Below the first place it is very nearly the inverse, and deliberately
+ * so:
  *
- * - `review-required` is the whole point of the view, so it leads.
+ * - `conflict` leads both orders — the one signal that does. That is the same
+ *   rule reaching the same answer twice for different reasons rather than an
+ *   exception to it: to the author a conflict is the first thing to fix, and to
+ *   a reviewer a conflicting pull request is *not reviewable*, so "do not read
+ *   this yet" is the loudest thing the row can say. It is the argument that
+ *   puts failing checks near the bottom of this order, arriving at the top
+ *   because a conflict is certain where a red build may be flake.
+ * - `review-required` is the whole point of the view, so it leads the rest.
  * - `changes-requested` is usually *your own* verdict, already delivered — the
  *   quietest thing an inbound row can say.
  * - failing checks and unresolved threads are the author's job, and a red pull
@@ -60,6 +73,7 @@ export const PRECEDENCE: Signal[] = [
  * row's colour and hides nothing. tests/inbound.test.ts asserts that.
  */
 export const INBOUND_PRECEDENCE: Signal[] = [
+  "conflict",
   "review-required",
   "checks-pending",
   "clean",
@@ -87,6 +101,11 @@ export interface PrRow {
   createdAt: string;
   review: ReviewDecision;
   ci: CiState;
+  /** The head cannot be merged into the base without a manual resolution.
+   * GitHub computes mergeability lazily, so `UNKNOWN` — and a response with no
+   * `mergeable` at all — is false here: no news, never a claimed conflict and
+   * never a claimed mergeable. See docs/adr/0004. */
+  conflict: boolean;
   /** Unresolved review threads. */
   unresolved: number;
   /** True when reviewThreads hit the page cap, so `unresolved` is a floor. */
@@ -181,6 +200,7 @@ export function rollupChecks(contexts: RawContext[]): CiState {
  * to say carries `clean`. */
 export function signalsFor(row: PrRow, view: View = DEFAULT_VIEW): Signal[] {
   const out: Signal[] = [];
+  if (row.conflict) out.push("conflict");
   if (row.review === "CHANGES_REQUESTED") out.push("changes-requested");
   if (row.ci === "fail") out.push("checks-failed");
   if (row.unresolved > 0) out.push("unresolved");
@@ -207,6 +227,7 @@ interface RawNode {
   url?: string;
   isDraft?: boolean;
   createdAt?: string;
+  mergeable?: string | null;
   headRefName?: string;
   reviewDecision?: string | null;
   reviewRequests?: { totalCount?: number } | null;
@@ -287,6 +308,10 @@ function toRow(n: RawNode, threadCap: number): PrRow {
     createdAt: n.createdAt ?? "",
     review: reviewOf(n),
     ci: rollupChecks(contexts ?? []),
+    // Only CONFLICTING is a conflict. MERGEABLE, UNKNOWN and a missing field
+    // are all "not conflicting" — the lazily-computed UNKNOWN deliberately
+    // reads the same as a clean branch rather than as a warning.
+    conflict: n.mergeable === "CONFLICTING",
     unresolved,
     // The thread page is capped, so a PR at the cap may have more unresolved
     // threads than we counted. Render that as a floor rather than as a

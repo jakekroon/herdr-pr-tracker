@@ -1,7 +1,7 @@
 {
   "data": {
     "search": {
-      "issueCount": 19,
+      "issueCount": 24,
       "nodes": [
         {
           "number": 100,
@@ -1107,6 +1107,201 @@
             "nodes": [
               {
                 "state": "APPROVED"
+              }
+            ]
+          }
+        },
+        {
+          "number": 119,
+          "title": "Conflicting and otherwise clean",
+          "url": "https://github.com/acme/repo/pull/119",
+          "isDraft": false,
+          "createdAt": "2026-01-21T00:00:00Z",
+          "headRefName": "b119",
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 120,
+          "title": "Conflicting draft",
+          "url": "https://github.com/acme/repo/pull/120",
+          "isDraft": true,
+          "createdAt": "2026-01-22T00:00:00Z",
+          "headRefName": "b120",
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 121,
+          "title": "Conflicting with changes requested and failing",
+          "url": "https://github.com/acme/repo/pull/121",
+          "isDraft": false,
+          "createdAt": "2026-01-23T00:00:00Z",
+          "headRefName": "b121",
+          "reviewDecision": "CHANGES_REQUESTED",
+          "mergeable": "CONFLICTING",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "FAILURE",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 122,
+          "title": "Mergeability not yet computed",
+          "url": "https://github.com/acme/repo/pull/122",
+          "isDraft": false,
+          "createdAt": "2026-01-24T00:00:00Z",
+          "headRefName": "b122",
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 123,
+          "title": "Explicitly mergeable",
+          "url": "https://github.com/acme/repo/pull/123",
+          "isDraft": false,
+          "createdAt": "2026-01-25T00:00:00Z",
+          "headRefName": "b123",
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "repository": {
+            "name": "repo",
+            "owner": {
+              "login": "acme"
+            }
+          },
+          "reviewThreads": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "conclusion": "SUCCESS",
+                          "status": "COMPLETED"
+                        }
+                      ]
+                    }
+                  }
+                }
               }
             ]
           }

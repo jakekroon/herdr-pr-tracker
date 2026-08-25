@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { headline, parseSearch, type PrRow } from "../src/model.ts";
+import { headline, parseSearch, PRECEDENCE, type PrRow } from "../src/model.ts";
 import {
   compactAge,
   compactRow,
+  CONFLICT_GLYPH,
   DRAFT_GLYPH,
   ELLIPSIS,
   header,
@@ -47,6 +48,7 @@ const RESET = "\x1b[0m";
 // Intensity runs close with normal-intensity, never a full reset: a reset
 // would also drop the colour the run sits inside.
 const NORMAL = "\x1b[22m";
+const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
 
 /** Every intensity terminator inside a dimmed row must re-open dim, or the
@@ -86,6 +88,60 @@ describe("renderRow", () => {
         expect(vis(renderRow(row, opts({ cols }))[0])).toBe(cols);
       }
     }
+  });
+
+  test("a conflict gets its own reserved column in the cluster", () => {
+    // The cell is reserved on every row, conflicted or not, so the cluster
+    // still aligns down the pane — the same rule the band's count cell
+    // follows. A conflicted row spends it; every other row leaves it blank.
+    const conflicted = plain(renderRow(pr(119), opts())[0]);
+    const clean = plain(renderRow(pr(112), opts())[0]);
+    expect(conflicted).toContain(CONFLICT_GLYPH);
+    expect(clean).not.toContain(CONFLICT_GLYPH);
+    // Mergeability GitHub has not computed yet paints nothing at all — the
+    // no-news case has to be silent on the *line*, not merely false in the row.
+    expect(plain(renderRow(pr(122), opts())[0])).not.toContain(CONFLICT_GLYPH);
+    expect(plain(renderRow(pr(123), opts())[0])).not.toContain(CONFLICT_GLYPH);
+    expect(vis(renderRow(pr(119), opts())[0])).toBe(44);
+    // Same right edge, so the reserved cell is what pays for the glyph rather
+    // than the cluster growing on the rows that carry one.
+    expect(conflicted.length - conflicted.trimEnd().length)
+      .toBe(clean.length - clean.trimEnd().length);
+  });
+
+  test("the cluster's glyphs are evenly separated, conflict included", () => {
+    // Every cell is one column with one column between it and its neighbour,
+    // so a row carrying all of them reads as spaced cells rather than as a
+    // run of glyphs jammed together. #121 conflicts, has changes requested and
+    // is failing, so it is the row that carries the most at once.
+    const line = plain(renderRow(pr(121), opts())[0]);
+    const cluster = line.slice(-9);
+    // conflict, separator, review, separator, the four-wide flag cell (empty
+    // here), then CI on the pane edge.
+    expect(cluster).toBe("⊘ ✗     ✗");
+  });
+
+  test("LOUD is a prefix of PRECEDENCE, or the needs-you count is wrong", () => {
+    // `header` and `repoHeader` both count from a row's *headline*, which is
+    // only equivalent to "carries a loud signal" while the loud signals are the
+    // top of the precedence order. Re-rank one without the other and the counts
+    // go quietly wrong, which is the kind of bug this widget has no symptom for.
+    expect(LOUD).toEqual(PRECEDENCE.slice(0, LOUD.length));
+  });
+
+  test("a conflict is bold in the authored view, like the other loud signals", () => {
+    expect(LOUD).toContain("conflict");
+    const line = renderRow(pr(119), opts())[0];
+    expect(line).toContain(BOLD);
+  });
+
+  test("a conflicting draft stays dim throughout, glyph included", () => {
+    // Bold is suppressed on a draft — the row is already dim, and bold inside
+    // dim renders inconsistently — so the conflict shows without it.
+    const line = renderRow(pr(120), opts())[0];
+    expect(dimThroughout(line)).toBe(true);
+    expect(plain(line)).toContain(CONFLICT_GLYPH);
+    expect(line).not.toContain(BOLD);
   });
 
   test("line two never exceeds the pane width", () => {
@@ -230,7 +286,8 @@ describe("header", () => {
   test("counts the open PRs, and the ones that are yours to act on", () => {
     const h = header(states.rows, opts({ cols: 60 }));
     const loud = states.rows.filter((r) =>
-      r.review === "CHANGES_REQUESTED" || r.ci === "fail" || r.unresolved > 0
+      r.conflict || r.review === "CHANGES_REQUESTED" || r.ci === "fail" ||
+      r.unresolved > 0
     ).length;
     expect(h).toContain(`${states.rows.length} open`);
     expect(h).toContain(`${loud} need you`);
@@ -448,8 +505,12 @@ describe("render", () => {
     const withAge = widths.find((c) => room(c).includes(prAge(row)))!;
     expect(room(withNumber)).not.toContain(prAge(row));
     expect(withAge).toBeGreaterThan(withNumber);
+    // Six characters, not eight: the conflict cell and its separator are
+    // reserved on every row, so at the narrowest width the branch has two
+    // columns less to spend than it did before that cell existed. That is the
+    // cost the reserved cell was accepted at, and this is where it shows.
     for (const cols of [20, withNumber, withAge, 80]) {
-      expect(room(cols)).toContain(row.branch.slice(0, 8));
+      expect(room(cols)).toContain(row.branch.slice(0, 6));
     }
   });
 
