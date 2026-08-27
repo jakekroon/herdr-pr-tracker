@@ -54,6 +54,7 @@ opens in your browser.
 | `◦` | *Awaiting Review only* — you are in the conversation but nobody asked you | plain |
 | `N` at the end of a repository rule | *My PRs only* — how many of that repository's pull requests need you | the loudest of them |
 | *nothing* | Ready for review, nothing to do | plain |
+| `⚠` under the last band | Not a pull request at all — a `config` problem, see [Configuration](#configuration) | yellow |
 
 A pull request can carry several of these at once, so each is drawn separately —
 nothing is hidden by something louder. The row's own colour is the loudest one it
@@ -294,7 +295,9 @@ not collide with the built-ins: `o`, `g`, `r`, `v` and `e` are taken.
 
 Optional. `cp config.example config`, or drop a `config` in
 `herdr plugin config-dir herdr-pr-tracker` — the plugin config dir is read second
-and wins. Every setting is documented in `config.example`.
+and wins. Every setting is documented in `config.example`. Values may be quoted
+or bare. The pane reads its config once, at startup, so toggle the widget off and
+on after an edit.
 
 Two are worth knowing about. `SEARCH_QUERY` is the whole definition of the
 **authored** view, so pointing it somewhere else re-aims that view entirely.
@@ -311,16 +314,32 @@ IGNORE_REPOS="acme/web-app acme/"
 ```
 
 `acme/web-app` is one repository; `acme/` is every repository under one owner.
+Spaces or commas separate entries, and two spellings of one entry count once —
+GitHub's qualifiers are case-insensitive, so `Acme/Web-App` and `acme/web-app`
+are one ignore.
+
 The slash is required. A bare `web-app` is **dropped**, because GitHub answers a
 repository qualifier with no owner by subtracting nothing and reporting no error,
 and a filter that silently does not filter is worse than one that refuses.
 
-A dropped entry is not silent: the pane carries `⚠ N bad IGNORE_REPOS entries`
-under the last repository until you fix it, and the pane process names the
-offending entries on stderr.
+A dropped entry is not silent: the pane carries `⚠ 2 bad IGNORE_REPOS entries`
+at the foot of the list — `⚠ 1 bad IGNORE_REPOS entry` for one. That line says
+only how many, because the pane is narrow; to see *which*, run the pane process
+by hand (`bun bin/pane.ts`), which names them on stderr before it takes the
+screen. In a Herdr pane that stderr line is painted and immediately covered, so
+treat the count as the signal and `config` as the place to look.
+
+The notice reflects the config as it was **when the pane started** — the pane
+reads `config` once — so fixing an entry clears the line at the next restart,
+not at the next poll. Its row is reserved out of the pane's height and cannot be
+pushed off the bottom by a long list, but not out of its width: a very narrow
+pane truncates the message, and one narrower still drops the line rather than
+wrap it and scroll the header away.
 
 This one *does* reach the inbound view, because removing a row cannot change what
-any row that stays means.
+any row that stays means. Both views are subtracted at the search, so the pane
+never learns what it left out: there is no "N ignored" count, and `0 open` with
+`✓ all clear` is a statement about what you track rather than about GitHub.
 
 Glyphs, colours, precedence and sort order are deliberately **not** configurable.
 A widget whose meaning depends on settings is a widget you have to remember the
@@ -347,7 +366,9 @@ It never shows stale data as though it were fresh. The header carries the age of
 what is on screen; past two poll intervals it turns yellow, and a failed refresh
 turns it red and says why (`auth failed`, `offline`, `rate limited`) while still
 admitting how old the rows are. An empty list says `0 open` — `0 inbound` in the other view — and `✓ all clear`, so
-"nothing to do" is never confusable with "the widget is broken".
+"nothing to do" is never confusable with "the widget is broken". Both counts are
+of what you track: `SEARCH_QUERY` and `IGNORE_REPOS` are applied at the search,
+so anything they exclude was never fetched and is not counted anywhere.
 
 The pane takes no keyboard input and cannot be typed into or killed with a
 keystroke. It **does** claim the mouse, in press/release SGR reporting only. That
@@ -368,7 +389,7 @@ tests/run.sh    # everything below, and what CI runs
 or the two halves separately:
 
 ```bash
-bun test        # 293 tests: no network, no gh, no Herdr
+bun test        # no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
 

@@ -94,6 +94,13 @@ function parseIgnoreList(
   return { entries, dropped };
 }
 
+/** The noun that agrees with the count. Shared by both sentences below rather
+ * than derived twice: they say one fact at two lengths, and two copies of the
+ * plural rule is two places for them to stop agreeing. */
+function entryNoun(n: number): string {
+  return n === 1 ? "entry" : "entries";
+}
+
 /**
  * What to say about ignore entries the parser refused, or null when there is
  * nothing to say.
@@ -104,9 +111,9 @@ function parseIgnoreList(
  */
 export function ignoreWarning(dropped: readonly string[]): string | null {
   if (dropped.length === 0) return null;
-  const plural = dropped.length === 1 ? "entry" : "entries";
-  return `dropped ${dropped.length} malformed IGNORE_REPOS ${plural} ` +
-    `(${dropped.join(", ")}) — each needs an owner: "owner/name", or ` +
+  return `dropped ${dropped.length} malformed IGNORE_REPOS ` +
+    `${entryNoun(dropped.length)} (${dropped.join(", ")}) — each needs an ` +
+    `owner: "owner/name", or ` +
     `"owner/" for every repository under one owner`;
 }
 
@@ -121,8 +128,7 @@ export function ignoreWarning(dropped: readonly string[]): string | null {
  */
 export function ignoreNotice(dropped: readonly string[]): string | null {
   if (dropped.length === 0) return null;
-  return `${dropped.length} bad IGNORE_REPOS ` +
-    (dropped.length === 1 ? "entry" : "entries");
+  return `${dropped.length} bad IGNORE_REPOS ${entryNoun(dropped.length)}`;
 }
 
 /** Parse `KEY=value` lines. Shell-shaped so the file is interchangeable with

@@ -216,4 +216,15 @@ describe("ignoreNotice", () => {
     expect(ignoreNotice(["a"])).toBe("1 bad IGNORE_REPOS entry");
     expect(ignoreNotice(["a", "b"])).toBe("2 bad IGNORE_REPOS entries");
   });
+
+  test("agrees with the stderr sentence about the noun", () => {
+    // Both docstrings claim the two cannot disagree about whether there is a
+    // problem. They share one plural rule to make that true of the wording too.
+    for (const n of [1, 2, 3]) {
+      const list = Array.from({ length: n }, (_, i) => `bad-${i}`);
+      const noun = n === 1 ? "entry" : "entries";
+      expect(ignoreNotice(list)).toContain(`${n} bad IGNORE_REPOS ${noun}`);
+      expect(ignoreWarning(list)).toContain(`${n} malformed IGNORE_REPOS ${noun}`);
+    }
+  });
 });

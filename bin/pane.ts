@@ -41,11 +41,14 @@ const MOUSE_OFF = `${ESC}[?1006l${ESC}[?1000l`;
 
 const cfg = await loadConfig(PLUGIN_ROOT, process.env.HERDR_PLUGIN_CONFIG_DIR);
 // Written before the alt screen is entered, so in a Herdr pane it is painted and
-// then immediately covered: this is a trail for a pane run directly or one that
-// exits early, **not** a message the user will see in passing. The protection
-// against a malformed entry is that it is dropped rather than sent — being told
-// about it is the lesser half, and this is as far as it goes without spending
-// header columns the list wants.
+// then immediately covered: this is a trail for a pane run directly (`bun
+// bin/pane.ts`) or one that exits early, **not** a message the user will see in
+// passing. README and config.example both say so rather than offering stderr as
+// the place to look — the in-pane count is the half that actually lands.
+//
+// The protection against a malformed entry is that it is dropped rather than
+// sent; being told about it is the lesser half, and this is as far as it goes
+// without spending header columns the list wants.
 const warning = ignoreWarning(cfg.ignoreDropped);
 if (warning) console.error(`herdr-pr-tracker: ${warning}`);
 // The half of that the reader will actually see. Short, because the pane is
