@@ -136,6 +136,10 @@ export interface RenderOpts {
    * hyperlink moves onto the branch. Set by `render` when the full layout
    * would not fit; never chosen by the caller. */
   compact?: boolean;
+  /** Something wrong with the configuration, said under the list. Not a failed
+   * refresh — that goes in the header, where it belongs to the age it
+   * qualifies. This is a standing problem the reader has to go and fix. */
+  notice?: string | null;
 }
 
 function paint(text: string, colour: keyof typeof FG, on: boolean): string {
@@ -658,6 +662,22 @@ export function compactRow(row: PrRow, o: RenderOpts): string {
 }
 
 /**
+ * A standing configuration problem, drawn under the list.
+ *
+ * Yellow and `⚠` rather than red: the list above it is correct, and what is
+ * wrong is something to go and fix rather than a widget that has failed. It
+ * cannot be confused with a pull request's own marks — none of them is this
+ * glyph, and none of them sits below the last band.
+ */
+function noticeLine(o: RenderOpts): string | null {
+  if (!o.notice) return null;
+  const body = clip(`\u26a0 ${o.notice}`, o.cols - leadWidth(o.view));
+  if (body.length === 0) return null;
+  return indentFor(o) + paint(body.slice(0, 1), "yellow", o.colour) +
+    dim(body.slice(1), o.colour);
+}
+
+/**
  * The whole pane.
  *
  * When the two-line layout will not fit, the rows are halved before any of
@@ -685,7 +705,14 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
   // repository heading sit at the same left edge with nothing between them and
   // read as one block. Skipped in a pane too short to spend a line on it.
   if (o.rows > 2) out.push("");
-  const budget = Math.max(0, o.rows - out.length);
+
+  // The notice sits at the foot of the list, and its line is reserved out of
+  // the budget before the rows are measured — so it costs a pull request rather
+  // than being clipped off the bottom. That is the right way round: a dropped
+  // pull request is counted by `+N older`, and a notice nobody can see is the
+  // whole bug this line exists to fix.
+  const notice = noticeLine(o);
+  const budget = Math.max(0, o.rows - out.length - (notice ? 1 : 0));
 
   if (rows.length === 0) {
     // The state a good day ends in, so it gets a mark of its own rather than
@@ -698,7 +725,8 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
     if (budget > 0 && o.fetchedAt != null) {
       out.push(indentFor(o) + paint("✓", "green", o.colour) + dim(" all clear", o.colour));
     }
-    return out;
+    if (notice && out.length < o.rows) out.push(notice);
+    return out.slice(0, o.rows);
   }
 
   // One heading per surviving repository, one blank line between groups, one
@@ -733,5 +761,6 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
     }
   }
   if (dropped > 0 && oldestLast) out.push(marker);
+  if (notice) out.push(notice);
   return out.slice(0, o.rows);
 }

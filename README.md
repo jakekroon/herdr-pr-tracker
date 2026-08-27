@@ -313,9 +313,11 @@ IGNORE_REPOS="acme/web-app acme/"
 `acme/web-app` is one repository; `acme/` is every repository under one owner.
 The slash is required. A bare `web-app` is **dropped**, because GitHub answers a
 repository qualifier with no owner by subtracting nothing and reporting no error,
-and a filter that silently does not filter is worse than one that refuses. A
-dropped entry is named on the pane process's stderr, which in practice you will
-only see if you run the pane yourself — so check the pane after editing this.
+and a filter that silently does not filter is worse than one that refuses.
+
+A dropped entry is not silent: the pane carries `⚠ N bad IGNORE_REPOS entries`
+under the last repository until you fix it, and the pane process names the
+offending entries on stderr.
 
 This one *does* reach the inbound view, because removing a row cannot change what
 any row that stays means.

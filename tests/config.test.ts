@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULTS, ignoreWarning, parseConfig } from "../src/config.ts";
+import {
+  DEFAULTS,
+  ignoreNotice,
+  ignoreWarning,
+  parseConfig,
+} from "../src/config.ts";
 
 describe("parseConfig", () => {
   test("ignores comments and blank lines", () => {
@@ -191,5 +196,24 @@ describe("ignoreWarning", () => {
   test("counts, and agrees with itself about the plural", () => {
     expect(ignoreWarning(["a"])).toContain("1 malformed IGNORE_REPOS entry");
     expect(ignoreWarning(["a", "b"])).toContain("2 malformed IGNORE_REPOS entries");
+  });
+});
+
+describe("ignoreNotice", () => {
+  test("says nothing when nothing was refused", () => {
+    expect(ignoreNotice([])).toBeNull();
+  });
+
+  test("is short enough for a narrow pane, and does not list the entries", () => {
+    // The pane has tens of columns, not hundreds. Naming the offending entries
+    // is `ignoreWarning`'s job, where there is room for them.
+    const n = ignoreNotice(["web-app", "https://github.com/acme/web-app"])!;
+    expect(n.length).toBeLessThanOrEqual(28);
+    expect(n).not.toContain("web-app");
+  });
+
+  test("counts, and agrees with itself about the plural", () => {
+    expect(ignoreNotice(["a"])).toBe("1 bad IGNORE_REPOS entry");
+    expect(ignoreNotice(["a", "b"])).toBe("2 bad IGNORE_REPOS entries");
   });
 });

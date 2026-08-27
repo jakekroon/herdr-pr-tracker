@@ -552,3 +552,58 @@ describe("render", () => {
     expect(render(live.rows, opts({ rows: 1 }))).toHaveLength(1);
   });
 });
+
+describe("notice", () => {
+  const NOTICE = "2 bad IGNORE_REPOS entries";
+
+  test("sits on the last line, under the final repository", () => {
+    const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
+    expect(out.at(-1)).toContain(NOTICE);
+    // Under the list, not inside it: the line above is still a pull request.
+    expect(out.at(-2)).not.toContain(NOTICE);
+  });
+
+  test("is marked and coloured as attention, not as failure", () => {
+    // A refused config entry is not a broken widget: the list above it is
+    // correct, and there is something to go and fix.
+    const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
+    expect(out.at(-1)).toContain("\x1b[33m⚠");
+  });
+
+  test("no notice leaves the pane exactly as it was", () => {
+    expect(render(live.rows, opts({ rows: 40 })))
+      .toEqual(render(live.rows, opts({ rows: 40, notice: null })));
+  });
+
+  test("appears under `all clear` when the list is empty", () => {
+    // The case an ignore list makes likeliest: everything ignored, and the one
+    // thing worth saying is that some of the ignoring did not parse.
+    const out = render([], opts({ notice: NOTICE }));
+    expect(out.at(-1)).toContain(NOTICE);
+    expect(out.at(-2)).toContain("all clear");
+  });
+
+  test("costs a pull request rather than being clipped away", () => {
+    // A row that is not on screen is counted by `+N older`; a notice that is
+    // not on screen is the bug this line exists to fix.
+    const rows = 12;
+    const with_ = render(live.rows, opts({ rows, notice: NOTICE }));
+    const without = render(live.rows, opts({ rows }));
+    expect(with_.at(-1)).toContain(NOTICE);
+    expect(with_.length).toBeLessThanOrEqual(rows);
+    expect(with_.filter((l) => l.includes("older")).length).toBe(1);
+    expect(without.length).toBeLessThanOrEqual(rows);
+  });
+
+  test("never pushes the pane over its row budget", () => {
+    for (const rows of [1, 2, 3, 4, 5, 11, 26, 40]) {
+      expect(render(live.rows, opts({ rows, notice: NOTICE })).length)
+        .toBeLessThanOrEqual(rows);
+    }
+  });
+
+  test("is clipped to the pane width like every other line", () => {
+    const out = render(live.rows, opts({ rows: 40, cols: 14, notice: NOTICE }));
+    expect(width(out.at(-1)!)).toBeLessThanOrEqual(14);
+  });
+});

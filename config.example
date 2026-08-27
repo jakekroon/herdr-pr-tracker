@@ -47,9 +47,10 @@
 #   acme/          every repository under one owner
 #   web-app        an ERROR — dropped (see below)
 #
-# A dropped entry is named on the pane process's stderr, which the alt screen
-# covers a moment later — so treat it as a trail, not a notification, and check
-# the pane after editing this.
+# A dropped entry shows in the pane, under the last repository, as
+# `⚠ N bad IGNORE_REPOS entries`, and stays there until the config is fixed —
+# the count only, because the pane is narrow. The pane process also names the
+# offending entries on stderr, where there is room for them.
 #
 # A bare name looks like the obvious thing to type and is exactly what must not
 # be guessed at: GitHub answers a repository qualifier with no owner by

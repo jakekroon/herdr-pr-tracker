@@ -6,7 +6,7 @@
 // process, which is the one part of a plugin that is allowed to stay alive.
 
 import { dirname, join } from "node:path";
-import { ignoreWarning, loadConfig } from "../src/config.ts";
+import { ignoreNotice, ignoreWarning, loadConfig } from "../src/config.ts";
 import { fetchInbound, fetchPrs, GhError } from "../src/gh.ts";
 import { listPanes, listWorkspaces, setPaneTitle } from "../src/herdr.ts";
 import type { PrRow } from "../src/model.ts";
@@ -48,6 +48,9 @@ const cfg = await loadConfig(PLUGIN_ROOT, process.env.HERDR_PLUGIN_CONFIG_DIR);
 // header columns the list wants.
 const warning = ignoreWarning(cfg.ignoreDropped);
 if (warning) console.error(`herdr-pr-tracker: ${warning}`);
+// The half of that the reader will actually see. Short, because the pane is
+// narrow; the stderr line above names the entries.
+const startupNotice = ignoreNotice(cfg.ignoreDropped);
 
 let rows: PrRow[] = [];
 let omitted = 0;
@@ -108,6 +111,10 @@ function paint() {
     showOwner: cfg.showOwner === "always" ||
       (cfg.showOwner === "auto" && needsOwner(rows)),
     omitted,
+    // Computed once at startup and unchanging, because the config is read once
+    // at startup: the pane says it on every frame so the reader cannot miss it
+    // by not having been looking when the process began.
+    notice: startupNotice,
   });
   // Derived from the painted frame, so whatever is hyperlinked is clickable and
   // the two can never disagree.

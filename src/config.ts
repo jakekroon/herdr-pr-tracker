@@ -110,6 +110,21 @@ export function ignoreWarning(dropped: readonly string[]): string | null {
     `"owner/" for every repository under one owner`;
 }
 
+/**
+ * The same refusal, short enough for the pane.
+ *
+ * Two sentences for one fact, deliberately: `ignoreWarning` names the offending
+ * entries because stderr has room for them, and the pane has tens of columns —
+ * so the line that has to fit there says only how many, and leaves the reader to
+ * the config file for which. Both count the same list, so they cannot disagree
+ * about whether there is a problem.
+ */
+export function ignoreNotice(dropped: readonly string[]): string | null {
+  if (dropped.length === 0) return null;
+  return `${dropped.length} bad IGNORE_REPOS ` +
+    (dropped.length === 1 ? "entry" : "entries");
+}
+
 /** Parse `KEY=value` lines. Shell-shaped so the file is interchangeable with
  * the `config`/`config.example` convention the sibling plugin established. */
 export function parseConfig(text: string): Partial<Config> {
