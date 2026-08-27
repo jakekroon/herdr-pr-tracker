@@ -9,7 +9,11 @@
 #   herdr plugin config-dir herdr-pr-tracker
 #
 # Everything is commented out at its default. The pane reads its config once at
-# startup, so toggle the widget off and on after editing.
+# startup, so toggle the widget off and on after editing — including to clear
+# the warning below.
+#
+# `KEY=value`, one per line, `#` comments a line out. A value may be quoted or
+# bare; a matched pair of single or double quotes is stripped.
 #
 # Glyphs, colours, signal precedence and sort order are deliberately NOT
 # configurable. A widget whose meaning depends on settings is a widget you have
@@ -36,6 +40,59 @@
 # This setting deliberately does not reach the inbound view at all.
 #SEARCH_QUERY="is:pr is:open author:@me archived:false"
 
+# Repositories and owners whose pull requests are never fetched, at all, in
+# either view. Separate entries with spaces or commas. Duplicates collapse, and
+# they collapse case-insensitively: GitHub's qualifiers ignore case, so
+# `Acme/Web-App` and `acme/web-app` are one ignore and count once in the warning
+# below.
+#
+#   IGNORE_REPOS="acme/web-app acme/metrics-service"
+#
+# The slash carries the meaning, and it is not optional:
+#
+#   acme/web-app   one repository
+#   acme/          every repository under one owner
+#   web-app        an ERROR — dropped (see below)
+#
+# A dropped entry shows at the foot of the list as `⚠ 2 bad IGNORE_REPOS
+# entries` — `⚠ 1 bad IGNORE_REPOS entry` for one — the count only, because the
+# pane is narrow. To see *which* entries, run `bun bin/pane.ts` by hand: it
+# names them on stderr before it takes the screen. Inside a Herdr pane that line
+# is painted and immediately covered, so the count is the signal you get.
+#
+# The warning is computed at startup along with the rest of this file, so fixing
+# an entry clears it at the next restart rather than at the next poll. Its line
+# is reserved out of the pane's height and cannot be crowded out by a long list;
+# its width is not reserved, so a very narrow pane truncates the message and one
+# narrower still drops the line rather than wrap it over the header.
+#
+# A bare name looks like the obvious thing to type and is exactly what must not
+# be guessed at: GitHub answers a repository qualifier with no owner by
+# subtracting nothing and reporting no error, so a parser that guessed would
+# hand you a filter that silently does not filter. There is no owner wildcard
+# to fall back on.
+#
+# Unlike SEARCH_QUERY this **does** reach the inbound view, because it can only
+# remove rows — it cannot relabel a row that stays, which is the thing the
+# inbound searches are protected from.
+#
+# Two consequences of subtracting at the search rather than hiding at the paint.
+# Ignored pull requests cost no page budget, so a noisy repository stops
+# crowding others out of MAX_PRS. And the pane never learns what it dropped, so
+# there is no "N ignored" marker, and `0 open · ✓ all clear` is a claim about
+# what you track rather than about GitHub — which is already true of
+# SEARCH_QUERY. A typo in an otherwise well-formed entry cannot be detected
+# either: it subtracts nothing, and looks exactly like an entry that works.
+#
+# Each entry adds a negated qualifier to every search, so the query grows with
+# the list. Forty negations were probed against the live API and accepted; no
+# ceiling above that has been measured. There is no cap enforced here, because a
+# cap has to drop entries to enforce itself, and a silently dropped ignore is the
+# failure this whole setting is shaped against. If a list ever does grow past
+# what GitHub will take, that arrives as a failed refresh in the pane header —
+# loud, and not something you could mistake for a filter that is working.
+#IGNORE_REPOS=""
+
 # Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
 # beyond this are counted in the "+N older" row rather than silently dropped.
 #MAX_PRS=100
@@ -44,7 +101,8 @@
 # from the one most of your PRs share, so the common case stays compact.
 #SHOW_OWNER=auto
 
-# Set to 0/off to render without colour, leaving the glyphs to carry the state.
+# Set to 0/off/false/no to render without colour, leaving the glyphs to carry
+# the state. `COLOUR` is accepted as well, and `COLOR` wins if both are set.
 #COLOR=on
 
 # Minimum seconds between sidebar-token lookups for a single pane. Focus events

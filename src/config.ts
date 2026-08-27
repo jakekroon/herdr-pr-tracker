@@ -3,7 +3,7 @@
 // widget you have to remember the settings of before you can read it.
 
 import { join } from "node:path";
-import { DEFAULT_SEARCH } from "./query.ts";
+import { DEFAULT_SEARCH, type IgnoreEntry } from "./query.ts";
 
 export interface Config {
   pollSeconds: number;
@@ -14,6 +14,13 @@ export interface Config {
   colour: boolean;
   /** Minimum seconds between per-pane sidebar-token lookups. */
   tokenThrottleSeconds: number;
+  /** Repositories and owners whose pull requests are never fetched, in either
+   * view. */
+  ignore: IgnoreEntry[];
+  /** Ignore entries the parser refused, verbatim. Carried on the config rather
+   * than warned about here so the pure layer stays pure and only the pane —
+   * not the sidebar token, which shares this loader — does the complaining. */
+  ignoreDropped: string[];
 }
 
 export const DEFAULTS: Config = {
@@ -23,7 +30,106 @@ export const DEFAULTS: Config = {
   showOwner: "auto",
   colour: true,
   tokenThrottleSeconds: 30,
+  ignore: [],
+  ignoreDropped: [],
 };
+
+// A GitHub login: alphanumerics and hyphens, never starting or ending with a
+// hyphen, and at most 39 characters. Deliberately no tighter than that — GitHub
+// also forbids consecutive hyphens, but a login that merely does not exist is
+// already an accepted failure of this feature (it subtracts nothing), so the
+// rule here only has to catch what is *certainly* not a login.
+//
+// A repository name additionally allows dots and underscores, and may begin with
+// one — `.github` is a real repository. `.` and `..` are not names, though.
+const VALID_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+const VALID_REPO_NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
+
+/**
+ * Split `IGNORE_REPOS` into entries, refusing anything ambiguous.
+ *
+ * Whitespace *and* commas separate, because neither character is legal in an
+ * owner or a repository name, so accepting both costs no ambiguity and stops a
+ * comma-typing user from ignoring nothing.
+ *
+ * The slash carries the meaning: `acme/web-app` is one repository, `acme/` is
+ * every repository under `acme`, and a bare `web-app` is an **error**. That last
+ * one is the point of the syntax rather than pedantry — GitHub answers both
+ * `-repo:web-app` and `-user:web-app` by subtracting nothing and reporting no
+ * error, so a parser that guessed which was meant would produce a filter that
+ * silently does not filter. URLs fail the same test, on the same grounds: one
+ * accepted paste-shape invites a queue of them.
+ *
+ * Duplicates collapse case-insensitively, because GitHub's qualifiers are
+ * case-insensitive and two spellings of one repository are one ignore. Refusals
+ * collapse the same way, so one mistake is reported once.
+ */
+function parseIgnoreList(
+  raw: string,
+): { entries: IgnoreEntry[]; dropped: string[] } {
+  const entries: IgnoreEntry[] = [];
+  const dropped: string[] = [];
+  const seen = new Set<string>();
+
+  for (const token of raw.split(/[\s,]+/)) {
+    if (!token) continue;
+    const slash = token.indexOf("/");
+    const owner = slash < 0 ? "" : token.slice(0, slash);
+    const name = slash < 0 ? "" : token.slice(slash + 1);
+    const ok = slash >= 0 && VALID_OWNER.test(owner) &&
+      (name === "" || VALID_REPO_NAME.test(name));
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!ok) {
+      dropped.push(token);
+      continue;
+    }
+    entries.push(
+      name === ""
+        ? { kind: "owner", owner }
+        : { kind: "repo", owner, name },
+    );
+  }
+  return { entries, dropped };
+}
+
+/** The noun that agrees with the count. Shared by both sentences below rather
+ * than derived twice: they say one fact at two lengths, and two copies of the
+ * plural rule is two places for them to stop agreeing. */
+function entryNoun(n: number): string {
+  return n === 1 ? "entry" : "entries";
+}
+
+/**
+ * What to say about ignore entries the parser refused, or null when there is
+ * nothing to say.
+ *
+ * Pure, and here rather than in the pane, for the reason `src/view.ts` gives for
+ * living outside `state.ts`: the pane is the I/O layer the tests never exercise,
+ * so a sentence composed there is a sentence that can never go red.
+ */
+export function ignoreWarning(dropped: readonly string[]): string | null {
+  if (dropped.length === 0) return null;
+  return `dropped ${dropped.length} malformed IGNORE_REPOS ` +
+    `${entryNoun(dropped.length)} (${dropped.join(", ")}) — each needs an ` +
+    `owner: "owner/name", or ` +
+    `"owner/" for every repository under one owner`;
+}
+
+/**
+ * The same refusal, short enough for the pane.
+ *
+ * Two sentences for one fact, deliberately: `ignoreWarning` names the offending
+ * entries because stderr has room for them, and the pane has tens of columns —
+ * so the line that has to fit there says only how many, and leaves the reader to
+ * the config file for which. Both count the same list, so they cannot disagree
+ * about whether there is a problem.
+ */
+export function ignoreNotice(dropped: readonly string[]): string | null {
+  if (dropped.length === 0) return null;
+  return `${dropped.length} bad IGNORE_REPOS ${entryNoun(dropped.length)}`;
+}
 
 /** Parse `KEY=value` lines. Shell-shaped so the file is interchangeable with
  * the `config`/`config.example` convention the sibling plugin established. */
@@ -59,6 +165,11 @@ export function parseConfig(text: string): Partial<Config> {
   if (out.SEARCH_QUERY) cfg.searchQuery = out.SEARCH_QUERY;
   if (out.SHOW_OWNER === "always" || out.SHOW_OWNER === "never" || out.SHOW_OWNER === "auto") {
     cfg.showOwner = out.SHOW_OWNER;
+  }
+  if (out.IGNORE_REPOS != null) {
+    const { entries, dropped } = parseIgnoreList(out.IGNORE_REPOS);
+    cfg.ignore = entries;
+    cfg.ignoreDropped = dropped;
   }
   if (out.COLOR != null || out.COLOUR != null) {
     const v = (out.COLOR ?? out.COLOUR)!.toLowerCase();

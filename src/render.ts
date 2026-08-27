@@ -114,6 +114,12 @@ const indentFor = (o: RenderOpts) => " ".repeat(leadWidth(o.view));
  * be eating columns the title needs more. */
 const MIN_TITLE = 12;
 
+/** A notice with less room than this says nothing the reader can act on: at two
+ * columns `clip` returns a bare `…`, which reads as a truncated pull request
+ * rather than as a warning. Dropped instead — the stderr line still names the
+ * problem, and a glyph that means nothing is worse than an absent one. */
+const MIN_NOTICE = 8;
+
 export interface RenderOpts {
   cols: number;
   rows: number;
@@ -136,6 +142,10 @@ export interface RenderOpts {
    * hyperlink moves onto the branch. Set by `render` when the full layout
    * would not fit; never chosen by the caller. */
   compact?: boolean;
+  /** Something wrong with the configuration, said under the list. Not a failed
+   * refresh — that goes in the header, where it belongs to the age it
+   * qualifies. This is a standing problem the reader has to go and fix. */
+  notice?: string | null;
 }
 
 function paint(text: string, colour: keyof typeof FG, on: boolean): string {
@@ -658,6 +668,45 @@ export function compactRow(row: PrRow, o: RenderOpts): string {
 }
 
 /**
+ * A standing configuration problem, drawn under the list.
+ *
+ * Yellow and `⚠` rather than red: the list above it is correct, and what is
+ * wrong is something to go and fix rather than a widget that has failed. It
+ * cannot be confused with a pull request's own marks — none of them is this
+ * glyph, and none of them sits below the last band.
+ *
+ * One column is left spare, unlike every other line in the pane. `⚠` (U+26A0)
+ * is East-Asian **Ambiguous** — the same hazard `⊘`, `◆`, `◌`, `▪` and `⚑`
+ * carry: `width()` counts it as one column, and a terminal configured to render
+ * ambiguous glyphs wide makes it two. Everywhere else that costs a column of a
+ * branch name. Here it would overflow the *last* line of the pane, and the wrap
+ * pushes the whole frame a row over budget and scrolls the header off the top.
+ *
+ * The glyph is painted separately from the message rather than sliced back off a
+ * clipped string: slicing by UTF-16 unit is only correct while the glyph stays
+ * in the BMP, and a message clipped away entirely left an empty `dim("")` run.
+ *
+ * The line is reserved *vertically*, not horizontally. `render` takes it out of
+ * the row budget so no number of pull requests can push it off the bottom, but
+ * width is not negotiable the same way: below `MIN_NOTICE` columns of room the
+ * line is dropped outright rather than wrapped, because a wrap on the last line
+ * scrolls the header off the top — the notice would take the pane's most useful
+ * line to say something the config file says better. README and config.example
+ * both say the count is the signal, and a pane that narrow has already lost the
+ * branch names the count would send you to look at.
+ */
+function noticeLine(o: RenderOpts): string | null {
+  if (!o.notice) return null;
+  const room = o.cols - leadWidth(o.view) - 1;
+  if (room < MIN_NOTICE) return null;
+  // The glyph and the space after it are the two columns the message does not get.
+  const text = clip(o.notice, room - 2);
+  if (text.length === 0) return null;
+  return indentFor(o) + paint("⚠", "yellow", o.colour) +
+    dim(` ${text}`, o.colour);
+}
+
+/**
  * The whole pane.
  *
  * When the two-line layout will not fit, the rows are halved before any of
@@ -685,7 +734,19 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
   // repository heading sit at the same left edge with nothing between them and
   // read as one block. Skipped in a pane too short to spend a line on it.
   if (o.rows > 2) out.push("");
-  const budget = Math.max(0, o.rows - out.length);
+
+  // The notice sits at the foot of the list, and its line is reserved out of
+  // the budget before the rows are measured — so it costs a pull request rather
+  // than being clipped off the bottom. That is the right way round: a dropped
+  // pull request is counted by `+N older`, and a notice nobody can see is the
+  // whole bug this line exists to fix.
+  //
+  // Reserving the line is only half of it. Everything pushed after this point
+  // has to respect the reservation, and the `+N older` marker did not — see
+  // `marked` below. A line taken outside the budget is taken *from the notice*,
+  // because the slice that ends this function trims the bottom.
+  const notice = noticeLine(o);
+  const budget = Math.max(0, o.rows - out.length - (notice ? 1 : 0));
 
   if (rows.length === 0) {
     // The state a good day ends in, so it gets a mark of its own rather than
@@ -698,7 +759,8 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
     if (budget > 0 && o.fetchedAt != null) {
       out.push(indentFor(o) + paint("✓", "green", o.colour) + dim(" all clear", o.colour));
     }
-    return out;
+    if (notice) out.push(notice);
+    return out.slice(0, o.rows);
   }
 
   // One heading per surviving repository, one blank line between groups, one
@@ -719,9 +781,18 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
   const ro: RenderOpts = { ...o, compact };
 
   const dropped = (o.omitted ?? 0) + (rows.length - keep);
+  // The walk above stops at `keep === 0` without testing whether *nothing* fits,
+  // and `cost(0, …)` is still 1 — the marker. In a pane so short that the notice
+  // took the only line, pushing it anyway overflowed, and the `slice` at the end
+  // trimmed the notice rather than the marker: the reservation above was
+  // defeated by the one line it was reserving against. So the marker is shown
+  // only when it was actually budgeted for. Nothing is lost by dropping it —
+  // the header already counts every open pull request, which is the same fact
+  // the marker restates, whereas a notice nobody can see is unrecoverable.
+  const marked = dropped > 0 && cost(keep, compact) <= budget;
   const marker = indentFor(o) +
     paint(`${ELLIPSIS} +${dropped} older`, "default", o.colour);
-  if (dropped > 0 && !oldestLast) out.push(marker);
+  if (marked && !oldestLast) out.push(marker);
 
   let first = true;
   for (const g of groupRows(keptRows(keep))) {
@@ -732,6 +803,7 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
       out.push(...(compact ? [compactRow(row, ro)] : renderRow(row, ro)));
     }
   }
-  if (dropped > 0 && oldestLast) out.push(marker);
+  if (marked && oldestLast) out.push(marker);
+  if (notice) out.push(notice);
   return out.slice(0, o.rows);
 }

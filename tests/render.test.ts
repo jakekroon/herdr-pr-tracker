@@ -552,3 +552,115 @@ describe("render", () => {
     expect(render(live.rows, opts({ rows: 1 }))).toHaveLength(1);
   });
 });
+
+describe("notice", () => {
+  const NOTICE = "2 bad IGNORE_REPOS entries";
+
+  test("sits on the last line, under the final repository", () => {
+    const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
+    expect(out.at(-1)).toContain(NOTICE);
+    // Under the list, not inside it: the line above is still a pull request.
+    expect(out.at(-2)).not.toContain(NOTICE);
+  });
+
+  test("is marked and coloured as attention, not as failure", () => {
+    // A refused config entry is not a broken widget: the list above it is
+    // correct, and there is something to go and fix.
+    const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
+    expect(out.at(-1)).toContain("\x1b[33m⚠");
+  });
+
+  test("no notice leaves the pane exactly as it was", () => {
+    expect(render(live.rows, opts({ rows: 40 })))
+      .toEqual(render(live.rows, opts({ rows: 40, notice: null })));
+  });
+
+  test("appears under `all clear` when the list is empty", () => {
+    // The case an ignore list makes likeliest: everything ignored, and the one
+    // thing worth saying is that some of the ignoring did not parse.
+    const out = render([], opts({ notice: NOTICE }));
+    expect(out.at(-1)).toContain(NOTICE);
+    expect(out.at(-2)).toContain("all clear");
+  });
+
+  test("costs a pull request rather than being clipped away", () => {
+    // A row that is not on screen is counted by `+N older`; a notice that is
+    // not on screen is the bug this line exists to fix.
+    const rows = 12;
+    const with_ = render(live.rows, opts({ rows, notice: NOTICE }));
+    const without = render(live.rows, opts({ rows }));
+    expect(with_.at(-1)).toContain(NOTICE);
+    expect(with_.length).toBeLessThanOrEqual(rows);
+    expect(with_.filter((l) => l.includes("older")).length).toBe(1);
+    expect(without.length).toBeLessThanOrEqual(rows);
+  });
+
+  test("never pushes the pane over its row budget", () => {
+    for (const rows of [1, 2, 3, 4, 5, 11, 26, 40]) {
+      expect(render(live.rows, opts({ rows, notice: NOTICE })).length)
+        .toBeLessThanOrEqual(rows);
+    }
+  });
+
+  test("survives every pane tall enough to hold a second line", () => {
+    // The budget assertion above passes whether the notice is on screen or
+    // clipped away, because `render` ends in a slice — so on its own it reads
+    // as a guard for the reservation while measuring something else entirely.
+    // This is the half that has to be checked directly: the marker used to
+    // escape the reservation at `keep === 0` and the slice trimmed the notice
+    // instead of it, silently, in every pane of three rows or fewer.
+    for (const rows of [2, 3, 4, 5, 11, 26, 40]) {
+      const out = render(live.rows, opts({ rows, notice: NOTICE }));
+      expect(out.some((l) => l.includes("IGNORE_REPOS"))).toBe(true);
+      expect(out.length).toBeLessThanOrEqual(rows);
+    }
+  });
+
+  test("yields to the header alone in a one-row pane", () => {
+    // The one pane where losing it is right: the header carries the count, the
+    // age and the switcher, and a notice in its place would cost all three.
+    const out = render(live.rows, opts({ rows: 1, notice: NOTICE }));
+    expect(out).toHaveLength(1);
+    expect(out[0]).not.toContain("IGNORE_REPOS");
+  });
+
+  test("the `+N older` marker gives up its line before the notice does", () => {
+    // Both want the last line of a very short pane. The marker restates what
+    // the header already counts; the notice is the only place its fact appears.
+    const out = render(live.rows, opts({ rows: 3, notice: NOTICE }));
+    expect(out.at(-1)).toContain(NOTICE);
+    expect(out.some((l) => l.includes("older"))).toBe(false);
+  });
+
+  test("an empty list keeps the notice too", () => {
+    for (const rows of [2, 3, 4, 40]) {
+      const out = render([], opts({ rows, notice: NOTICE }));
+      expect(out.some((l) => l.includes("IGNORE_REPOS"))).toBe(true);
+      expect(out.length).toBeLessThanOrEqual(rows);
+    }
+  });
+
+  test("leaves a column spare, because the glyph may render wide", () => {
+    // U+26A0 is East-Asian Ambiguous: `width()` counts it as one column and a
+    // terminal set to render ambiguous glyphs wide makes it two. On the last
+    // line of the pane that difference wraps the frame a row over budget.
+    for (const cols of [12, 20, 40, 80]) {
+      const out = render(live.rows, opts({ rows: 40, cols, notice: NOTICE }));
+      expect(width(out.at(-1)!)).toBeLessThanOrEqual(cols - 1);
+    }
+  });
+
+  test("is dropped rather than shown as a bare ellipsis", () => {
+    // Clipped to a column or two the notice becomes `…`, which reads as a
+    // truncated pull request. Nothing is better than a glyph that misleads.
+    for (const cols of [1, 4, 8, 10]) {
+      const out = render(live.rows, opts({ rows: 40, cols, notice: NOTICE }));
+      expect(out.some((l) => l.includes("\u26a0"))).toBe(false);
+    }
+  });
+
+  test("is clipped to the pane width like every other line", () => {
+    const out = render(live.rows, opts({ rows: 40, cols: 14, notice: NOTICE }));
+    expect(width(out.at(-1)!)).toBeLessThanOrEqual(14);
+  });
+});

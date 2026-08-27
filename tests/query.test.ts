@@ -6,6 +6,7 @@ import {
   INBOUND_SEARCHES,
   SEARCH_PAGE,
   SEARCH_QUERY,
+  withIgnores,
 } from "../src/query.ts";
 
 describe("inbound searches", () => {
@@ -107,5 +108,52 @@ describe("paging", () => {
     // The cap belongs to the union: three searches each capped at 20 can
     // between them miss a row that belongs in the top 20 overall.
     expect(SEARCH_PAGE).toBe(100);
+  });
+});
+
+describe("withIgnores", () => {
+  const repo = (owner: string, name: string) =>
+    ({ kind: "repo", owner, name }) as const;
+  const ownerOf = (o: string) => ({ kind: "owner", owner: o }) as const;
+
+  test("a repository becomes a negated repo qualifier", () => {
+    expect(withIgnores("Q", [repo("acme", "web-app")]))
+      .toBe("Q -repo:acme/web-app");
+  });
+
+  test("an owner becomes a negated user qualifier, not org and not owner", () => {
+    // `user:` is the documented spelling and covers organisations as well as
+    // personal accounts; `owner:` works but is undocumented, and an
+    // undocumented alias in a filter that fails silently is the wrong risk.
+    expect(withIgnores("Q", [ownerOf("acme")])).toBe("Q -user:acme");
+  });
+
+  test("every entry is emitted, in order", () => {
+    expect(withIgnores("Q", [repo("acme", "web-app"), ownerOf("other")]))
+      .toBe("Q -repo:acme/web-app -user:other");
+  });
+
+  const entries = [{ kind: "repo", owner: "acme", name: "web-app" }] as const;
+
+  test("an empty list returns the query untouched", () => {
+    expect(withIgnores(DEFAULT_SEARCH, [])).toBe(DEFAULT_SEARCH);
+  });
+
+  test("appends to the authored search", () => {
+    expect(withIgnores(DEFAULT_SEARCH, [...entries]))
+      .toBe(`${DEFAULT_SEARCH} -repo:acme/web-app`);
+  });
+
+  test("appends to a user-supplied search as readily as to the default", () => {
+    // Deliberately no conflict detection: a positive `repo:` the ignore list
+    // contradicts yields an empty list, which is the user's own contradiction.
+    expect(withIgnores("is:pr author:@me repo:acme/web-app", [...entries]))
+      .toBe("is:pr author:@me repo:acme/web-app -repo:acme/web-app");
+  });
+
+  test("reaches every inbound search, so a view cannot forget it", () => {
+    for (const s of INBOUND_SEARCHES) {
+      expect(withIgnores(s.q, [...entries])).toContain("-repo:acme/web-app");
+    }
   });
 });
