@@ -145,3 +145,47 @@ ${
 // load-bearing for the reviewer/involved distinction, and a user overriding
 // them would break the meaning of the glyph with no way to notice.
 export const DEFAULT_SEARCH = "is:pr is:open author:@me archived:false";
+
+// --- ignoring ---------------------------------------------------------------
+
+/**
+ * One entry in the ignore list, already known to be well-formed. Two shapes
+ * rather than one string, so the decision "is this a repository or an owner?"
+ * is made once — where the config is parsed — and never re-derived from the
+ * text by the code that emits the qualifier. See CONTEXT.md.
+ */
+export type IgnoreEntry =
+  | { kind: "repo"; owner: string; name: string }
+  | { kind: "owner"; owner: string };
+
+/**
+ * A search with the ignore list subtracted from it.
+ *
+ * Applied to the authored search and to all three inbound searches, which is
+ * the one place `SEARCH_QUERY` is deliberately not — see
+ * docs/adr/0005-ignore-list-reaches-both-views.md. The short of it: re-aiming
+ * a search can route a row in under a reason nobody established for it, and
+ * subtraction cannot. A shorter list is what the `MAX_PRS` cap already does.
+ *
+ * `-user:` for an owner rather than `-org:` or `-owner:`: probed against the
+ * live API, all three subtract every repository under an account whether it is
+ * a personal one or an organisation, but only `user:` and `org:` are documented
+ * for issue search — and `org:` is the one that reads as though it would not
+ * cover a personal account. An undocumented alias is a poor bet in a filter
+ * whose failure mode is silence: GitHub answers a malformed qualifier by
+ * subtracting nothing and reporting no error.
+ *
+ * Nothing here inspects the query it is appending to. A user who both narrows
+ * `SEARCH_QUERY` to `repo:acme/web-app` and ignores `acme/web-app` gets an
+ * empty list — their own contradiction, and detecting it would mean parsing
+ * GitHub's search grammar, which this plugin has no business knowing.
+ */
+export function withIgnores(q: string, entries: readonly IgnoreEntry[]): string {
+  return entries.reduce(
+    (acc, e) =>
+      acc +
+      (e.kind === "repo" ? ` -repo:${e.owner}/${e.name}` : ` -user:${e.owner}`),
+    q,
+  );
+}
+

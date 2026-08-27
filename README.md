@@ -296,12 +296,29 @@ Optional. `cp config.example config`, or drop a `config` in
 `herdr plugin config-dir herdr-pr-tracker` — the plugin config dir is read second
 and wins. Every setting is documented in `config.example`.
 
-The one worth knowing about is `SEARCH_QUERY`: it is the whole definition of the
+Two are worth knowing about. `SEARCH_QUERY` is the whole definition of the
 **authored** view, so pointing it somewhere else re-aims that view entirely.
 
 It deliberately does not reach the inbound view. That view's three searches are
 what tell a row you were *asked* from a row you are merely *involved* in, and an
 override would change what `◦` means with no way for you to notice.
+
+`IGNORE_REPOS` is repositories and owners the pane never fetches at all, in
+**either** view:
+
+```
+IGNORE_REPOS="acme/web-app acme/"
+```
+
+`acme/web-app` is one repository; `acme/` is every repository under one owner.
+The slash is required. A bare `web-app` is **dropped**, because GitHub answers a
+repository qualifier with no owner by subtracting nothing and reporting no error,
+and a filter that silently does not filter is worse than one that refuses. A
+dropped entry is named on the pane process's stderr, which in practice you will
+only see if you run the pane yourself — so check the pane after editing this.
+
+This one *does* reach the inbound view, because removing a row cannot change what
+any row that stays means.
 
 Glyphs, colours, precedence and sort order are deliberately **not** configurable.
 A widget whose meaning depends on settings is a widget you have to remember the

@@ -3,11 +3,13 @@
 
 import { parseInbound, parseSearch, type PrList } from "./model.ts";
 import {
+  type IgnoreEntry,
   INBOUND_QUERY,
   inboundComplete,
   INBOUND_SEARCHES,
   SEARCH_PAGE,
   SEARCH_QUERY,
+  withIgnores,
 } from "./query.ts";
 
 export type GhFailure = "auth" | "network" | "rate" | "other";
@@ -103,17 +105,25 @@ async function graphql(
  *
  * `threads` caps reviewThreads per PR; a PR at the cap reports its unresolved
  * count as a floor rather than a confident number (model.unresolvedCapped).
+ *
+ * `ignore` is subtracted here rather than by the caller, for the same reason
+ * `fetchInbound` subtracts it too: applied at the call sites, a view could be
+ * added that forgot to, and the symptom would be a setting that works in one
+ * view and not the other. It has no default for the same reason — a required
+ * parameter makes tsc the enforcer, which is where this repo puts invariants it
+ * does not want to rely on a reader noticing.
  */
 export async function fetchPrs(
   query: string,
   maxPrs: number,
+  ignore: readonly IgnoreEntry[],
   threads = 100,
 ): Promise<PrList> {
   const payload = await graphql([
     "-f",
     `query=${SEARCH_QUERY}`,
     "-F",
-    `q=${query}`,
+    `q=${withIgnores(query, ignore)}`,
     "-F",
     `prs=${maxPrs}`,
     "-F",
@@ -129,12 +139,23 @@ export async function fetchPrs(
  * Deliberately not parameterised by a config query. The three are load-bearing
  * for the reviewer/involved distinction, and an override would break what the
  * glyph means with no way for the reader to notice.
+ *
+ * The ignore list is the one exception, and it is not an exception to that rule
+ * so much as outside it: it can only remove rows, and no surviving row's reason
+ * changes because another row left. See
+ * docs/adr/0005-ignore-list-reaches-both-views.md.
  */
-export async function fetchInbound(maxPrs: number, threads = 100): Promise<PrList> {
+export async function fetchInbound(
+  maxPrs: number,
+  ignore: readonly IgnoreEntry[],
+  threads = 100,
+): Promise<PrList> {
   const payload = await graphql([
     "-f",
     `query=${INBOUND_QUERY}`,
-    ...INBOUND_SEARCHES.flatMap((s) => ["-F", `${s.alias}=${s.q}`]),
+    ...INBOUND_SEARCHES.flatMap((
+      s,
+    ) => ["-F", `${s.alias}=${withIgnores(s.q, ignore)}`]),
     "-F",
     // Each search is paged in full and the configured cap is applied to the
     // union afterwards, which is where it belongs: three searches each capped

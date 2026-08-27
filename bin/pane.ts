@@ -6,7 +6,7 @@
 // process, which is the one part of a plugin that is allowed to stay alive.
 
 import { dirname, join } from "node:path";
-import { loadConfig } from "../src/config.ts";
+import { ignoreWarning, loadConfig } from "../src/config.ts";
 import { fetchInbound, fetchPrs, GhError } from "../src/gh.ts";
 import { listPanes, listWorkspaces, setPaneTitle } from "../src/herdr.ts";
 import type { PrRow } from "../src/model.ts";
@@ -40,6 +40,14 @@ const MOUSE_ON = `${ESC}[?1000h${ESC}[?1006h`;
 const MOUSE_OFF = `${ESC}[?1006l${ESC}[?1000l`;
 
 const cfg = await loadConfig(PLUGIN_ROOT, process.env.HERDR_PLUGIN_CONFIG_DIR);
+// Written before the alt screen is entered, so in a Herdr pane it is painted and
+// then immediately covered: this is a trail for a pane run directly or one that
+// exits early, **not** a message the user will see in passing. The protection
+// against a malformed entry is that it is dropped rather than sent — being told
+// about it is the lesser half, and this is as far as it goes without spending
+// header columns the list wants.
+const warning = ignoreWarning(cfg.ignoreDropped);
+if (warning) console.error(`herdr-pr-tracker: ${warning}`);
 
 let rows: PrRow[] = [];
 let omitted = 0;
@@ -252,8 +260,8 @@ async function refresh(target: View) {
     // The inbound view is deliberately not `fetchPrs` with a different query:
     // it is three searches and a dedup, and its rows carry a reason.
     const list = target === "inbound"
-      ? await fetchInbound(cfg.maxPrs)
-      : await fetchPrs(cfg.searchQuery, cfg.maxPrs);
+      ? await fetchInbound(cfg.maxPrs, cfg.ignore)
+      : await fetchPrs(cfg.searchQuery, cfg.maxPrs, cfg.ignore);
     // Workspace linkage is local and cheap, and a failure to read it must not
     // discard a good PR fetch — so it degrades to "nothing linked".
     let linked = list.rows;

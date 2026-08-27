@@ -36,6 +36,40 @@
 # This setting deliberately does not reach the inbound view at all.
 #SEARCH_QUERY="is:pr is:open author:@me archived:false"
 
+# Repositories and owners whose pull requests are never fetched, at all, in
+# either view. Separate entries with spaces or commas.
+#
+#   IGNORE_REPOS="acme/web-app acme/metrics-service"
+#
+# The slash carries the meaning, and it is not optional:
+#
+#   acme/web-app   one repository
+#   acme/          every repository under one owner
+#   web-app        an ERROR — dropped (see below)
+#
+# A dropped entry is named on the pane process's stderr, which the alt screen
+# covers a moment later — so treat it as a trail, not a notification, and check
+# the pane after editing this.
+#
+# A bare name looks like the obvious thing to type and is exactly what must not
+# be guessed at: GitHub answers a repository qualifier with no owner by
+# subtracting nothing and reporting no error, so a parser that guessed would
+# hand you a filter that silently does not filter. There is no owner wildcard
+# to fall back on.
+#
+# Unlike SEARCH_QUERY this **does** reach the inbound view, because it can only
+# remove rows — it cannot relabel a row that stays, which is the thing the
+# inbound searches are protected from.
+#
+# Two consequences of subtracting at the search rather than hiding at the paint.
+# Ignored pull requests cost no page budget, so a noisy repository stops
+# crowding others out of MAX_PRS. And the pane never learns what it dropped, so
+# there is no "N ignored" marker, and `0 open · ✓ all clear` is a claim about
+# what you track rather than about GitHub — which is already true of
+# SEARCH_QUERY. A typo in an otherwise well-formed entry cannot be detected
+# either: it subtracts nothing, and looks exactly like an entry that works.
+#IGNORE_REPOS=""
+
 # Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
 # beyond this are counted in the "+N older" row rather than silently dropped.
 #MAX_PRS=100
