@@ -4,12 +4,9 @@
 import { parseInbound, parseSearch, type PrList } from "./model.ts";
 import {
   type IgnoreEntry,
-  INBOUND_QUERY,
+  inboundArgs,
   inboundComplete,
-  INBOUND_SEARCHES,
-  SEARCH_PAGE,
-  SEARCH_QUERY,
-  withIgnores,
+  searchArgs,
 } from "./query.ts";
 
 export type GhFailure = "auth" | "network" | "rate" | "other";
@@ -106,12 +103,12 @@ async function graphql(
  * `threads` caps reviewThreads per PR; a PR at the cap reports its unresolved
  * count as a floor rather than a confident number (model.unresolvedCapped).
  *
- * `ignore` is subtracted here rather than by the caller, for the same reason
- * `fetchInbound` subtracts it too: applied at the call sites, a view could be
- * added that forgot to, and the symptom would be a setting that works in one
- * view and not the other. It has no default for the same reason — a required
- * parameter makes tsc the enforcer, which is where this repo puts invariants it
- * does not want to rely on a reader noticing.
+ * `ignore` is subtracted inside `searchArgs` rather than by the caller, for the
+ * same reason the inbound request subtracts it too: applied at the call sites, a
+ * view could be added that forgot to, and the symptom would be a setting that
+ * works in one view and not the other. It has no default for the same reason — a
+ * required parameter makes tsc the enforcer, which is where this repo puts
+ * invariants it does not want to rely on a reader noticing.
  */
 export async function fetchPrs(
   query: string,
@@ -119,16 +116,10 @@ export async function fetchPrs(
   ignore: readonly IgnoreEntry[],
   threads = 100,
 ): Promise<PrList> {
-  const payload = await graphql([
-    "-f",
-    `query=${SEARCH_QUERY}`,
-    "-F",
-    `q=${withIgnores(query, ignore)}`,
-    "-F",
-    `prs=${maxPrs}`,
-    "-F",
-    `threads=${threads}`,
-  ], (data) => Boolean(data.search));
+  const payload = await graphql(
+    searchArgs(query, maxPrs, ignore, threads),
+    (data) => Boolean(data.search),
+  );
   return parseSearch(payload, threads);
 }
 
@@ -150,20 +141,7 @@ export async function fetchInbound(
   ignore: readonly IgnoreEntry[],
   threads = 100,
 ): Promise<PrList> {
-  const payload = await graphql([
-    "-f",
-    `query=${INBOUND_QUERY}`,
-    ...INBOUND_SEARCHES.flatMap((
-      s,
-    ) => ["-F", `${s.alias}=${withIgnores(s.q, ignore)}`]),
-    "-F",
-    // Each search is paged in full and the configured cap is applied to the
-    // union afterwards, which is where it belongs: three searches each capped
-    // at 20 can between them miss a row that belongs in the top 20 overall.
-    `prs=${SEARCH_PAGE}`,
-    "-F",
-    `threads=${threads}`,
-  ], inboundComplete);
+  const payload = await graphql(inboundArgs(ignore, threads), inboundComplete);
   return parseInbound(payload, threads, maxPrs);
 }
 

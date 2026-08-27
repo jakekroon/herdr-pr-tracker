@@ -189,3 +189,54 @@ export function withIgnores(q: string, entries: readonly IgnoreEntry[]): string 
   );
 }
 
+// --- request arguments -------------------------------------------------------
+//
+// The `gh api graphql` argument lists live here rather than inline in `gh.ts`
+// for one reason: `gh.ts` spawns, so nothing in it is reachable from a test, and
+// "every search this plugin sends has the ignore list subtracted from it" is
+// exactly the sort of invariant that has to be. Built here it is ordinary data,
+// and a view added without `withIgnores` fails a test that reads the arguments
+// GitHub would actually receive.
+
+/** The authored view's request: one document, one search. */
+export function searchArgs(
+  query: string,
+  maxPrs: number,
+  ignore: readonly IgnoreEntry[],
+  threads: number,
+): string[] {
+  return [
+    "-f",
+    `query=${SEARCH_QUERY}`,
+    "-F",
+    `q=${withIgnores(query, ignore)}`,
+    "-F",
+    `prs=${maxPrs}`,
+    "-F",
+    `threads=${threads}`,
+  ];
+}
+
+/**
+ * The inbound view's request: one document, three aliased searches.
+ *
+ * No `maxPrs`. Each search is paged in full and the configured cap is applied to
+ * the union afterwards, which is where it belongs: three searches each capped at
+ * 20 can between them miss a row that belongs in the top 20 overall.
+ */
+export function inboundArgs(
+  ignore: readonly IgnoreEntry[],
+  threads: number,
+): string[] {
+  return [
+    "-f",
+    `query=${INBOUND_QUERY}`,
+    ...INBOUND_SEARCHES.flatMap((
+      s,
+    ) => ["-F", `${s.alias}=${withIgnores(s.q, ignore)}`]),
+    "-F",
+    `prs=${SEARCH_PAGE}`,
+    "-F",
+    `threads=${threads}`,
+  ];
+}
