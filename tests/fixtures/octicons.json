@@ -1,0 +1,21 @@
+{
+  "_source": "https://raw.githubusercontent.com/ryanoasis/nerd-fonts/<tag>/bin/scripts/lib/i_oct.sh",
+  "_tags": ["v3.4.0", "v3.5.1"],
+  "_note": "Every codepoint below was read out of the upstream glyph map at BOTH tags and is identical in both. This is the external oracle for src/glyphs.ts: the comment beside a mark names an Octicon, and only this file can prove the codepoint beside it is that Octicon. Regenerate on a Nerd Fonts bump by re-reading i_oct.sh at the new tag — Octicons were remapped once already, at Nerd Fonts 3.0. Ghostty embeds Symbols Nerd Font 3.4.0, which is why the older tag is still checked.",
+  "marks": {
+    "ci.pass": { "octicon": "nf-oct-check", "codepoint": "f42e" },
+    "ci.fail": { "octicon": "nf-oct-x", "codepoint": "f467" },
+    "ci.pending": { "octicon": "nf-oct-dot_fill", "codepoint": "f444" },
+    "review.APPROVED": { "octicon": "nf-oct-check_circle", "codepoint": "f49e" },
+    "review.CHANGES_REQUESTED": { "octicon": "nf-oct-x_circle", "codepoint": "f52f" },
+    "review.REVIEW_REQUIRED": { "octicon": "nf-oct-eye", "codepoint": "f441" },
+    "conflict": { "octicon": "nf-oct-no_entry", "codepoint": "f4f4" },
+    "linked": { "octicon": "nf-oct-git_branch", "codepoint": "f418" },
+    "draft": { "octicon": "nf-oct-git_pull_request_draft", "codepoint": "f4dd" },
+    "involved": { "octicon": "nf-oct-comment", "codepoint": "f41f" },
+    "unresolved": { "octicon": "nf-oct-comment_discussion", "codepoint": "f442" },
+    "notice": { "octicon": "nf-oct-alert", "codepoint": "f421" },
+    "refreshing": { "octicon": "nf-oct-sync", "codepoint": "f46a" },
+    "clear": { "octicon": "nf-oct-checklist", "codepoint": "f45e" }
+  }
+}

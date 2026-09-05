@@ -61,7 +61,62 @@ nothing is hidden by something louder. The row's own colour is the loudest one i
 carries, in this order: conflict, changes requested, failing checks, unresolved
 threads, review required, checks running, approved, clean.
 
-Some deliberate choices worth knowing:
+### Marks in a Nerd Font
+
+The marks above are geometric shapes and dingbats, and **most monospace fonts do
+not have them**. Of the eleven, Monaco — macOS's default — has exactly one
+(`◆`); the other ten are drawn by OS font fallback out of whichever proportional
+font happens to have them. That is why they can look like they came from
+different typefaces. They did.
+
+`GLYPHS=nerd` draws [Octicons](https://primer.style/octicons/), GitHub's own icon
+set, instead. Same cells, same widths, same meanings — a typeface, not a
+vocabulary — plus one thing the default set cannot say: a review verdict and a
+build result get separate marks, where the default spends `✓` on both a passing
+build and an approval.
+
+Set it in `config` — either the copy beside the plugin (`cp config.example
+config`) or the one in `herdr plugin config-dir herdr-pr-tracker`, which is read
+second and wins:
+
+```
+GLYPHS=nerd
+```
+
+Swap back with `GLYPHS=unicode`, or by deleting the line. Write the name in
+lower case. Anything else — `Nerd`, `octicons`, a typo — is ignored and the
+default stands, silently, because painting blank cells over a typo is worse than
+ignoring it.
+
+| Mark | Octicon | | Mark | Octicon |
+|---|---|---|---|---|
+| conflict | `no-entry` | | draft | `git-pull-request-draft` |
+| changes requested | `x-circle` | | workspace open | `git-branch` |
+| checks failing | `x` | | in the conversation | `comment` |
+| unresolved threads | `comment-discussion` | | checks running | `dot-fill` |
+| review required | `eye` | | approved | `check-circle` |
+| config problem | `alert` | | checks passing | `check` |
+| nothing open | `checklist` | | sidebar refreshing | `sync` |
+
+It needs a font that has them:
+
+| Ghostty | nothing to do — it embeds Symbols Nerd Font 3.4.0 in its own binary |
+|---|---|
+| **iTerm2** | `brew install --cask font-symbols-only-nerd-font`, then Profiles → Text → "Use a different font for non-ASCII text" |
+| **elsewhere** | any patched [Nerd Font](https://www.nerdfonts.com) as the terminal font |
+
+The pane reads its config once, at startup, and reloading the plugin does not
+restart the pane process. So after editing `GLYPHS`, close the widget and let it
+come back:
+
+```sh
+herdr plugin pane close <pane-id>   # the id from `herdr pane list`
+```
+
+A missing glyph is a blank cell rather than an error, so look at the pane once it
+returns. The default stays `unicode`, which needs nothing installed.
+
+The rules behind the colours and the marks:
 
 - **A clean pull request is uncoloured.** If every row is coloured, the colour
   tells you nothing.
@@ -95,7 +150,7 @@ Some deliberate choices worth knowing:
   to. The widget reports what GitHub reports rather than guessing whose turn it
   is, so a thread the reviewer has not resolved keeps its row yellow.
 - `▪` is the one thing GitHub's own pull request list cannot tell you: which of
-  these you actually have checked out right now.
+  these you have checked out right now.
 
 Ordering is **oldest first**, by creation date, and it never changes as statuses
 change — rows do not jump around while you glance at them. Drafts stay in date
@@ -299,8 +354,8 @@ and wins. Every setting is documented in `config.example`. Values may be quoted
 or bare. The pane reads its config once, at startup, so toggle the widget off and
 on after an edit.
 
-Two are worth knowing about. `SEARCH_QUERY` is the whole definition of the
-**authored** view, so pointing it somewhere else re-aims that view entirely.
+`SEARCH_QUERY` is the whole definition of the **authored** view, so pointing it
+somewhere else re-aims that view entirely.
 
 It deliberately does not reach the inbound view. That view's three searches are
 what tell a row you were *asked* from a row you are merely *involved* in, and an
@@ -341,9 +396,11 @@ any row that stays means. Both views are subtracted at the search, so the pane
 never learns what it left out: there is no "N ignored" count, and `0 open` with
 `✓ all clear` is a statement about what you track rather than about GitHub.
 
-Glyphs, colours, precedence and sort order are deliberately **not** configurable.
-A widget whose meaning depends on settings is a widget you have to remember the
-settings of before you can read it.
+Signal precedence, sort order and what any mark *means* are deliberately **not**
+configurable. A widget whose meaning depends on settings is a widget you have to
+remember the settings of before you can read it. `GLYPHS` and `COLOR` are not
+exceptions to that — they say what your terminal can draw, not what a row means.
+See [Marks in a Nerd Font](#marks-in-a-nerd-font) for the glyph swap.
 
 ## How it works
 

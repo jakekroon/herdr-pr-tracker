@@ -79,7 +79,7 @@ if (!branch) {
 
 // Keep the number visible while the lookup runs, so the sidebar shows work in
 // progress rather than appearing to hang on a stale glyph.
-const pending = refreshingLabel(pane.tokens?.[TOKEN]);
+const pending = refreshingLabel(pane.tokens?.[TOKEN], false, cfg.glyphs);
 if (pending) await setToken(pane.pane_id, TOKEN, pending);
 
 const pr = await fetchBranchPr(cwd, branch);
@@ -91,4 +91,4 @@ if (!pr || pr.state !== "OPEN") {
 }
 
 const ci = rollupBuckets(await fetchBranchChecks(cwd, branch));
-await setToken(pane.pane_id, TOKEN, tokenLabel({ number: pr.number, ci, isDraft: pr.isDraft }));
+await setToken(pane.pane_id, TOKEN, tokenLabel({ number: pr.number, ci, isDraft: pr.isDraft }, cfg.glyphs));

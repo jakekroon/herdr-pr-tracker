@@ -79,6 +79,11 @@ export function otherView(view: View): View {
  * `branchLine` uses for its trailing text: a narrow pane keeps a control that
  * says less rather than losing it altogether.
  */
+// Labels, not marks, which is why `GLYPHS` does not reach them: they are the
+// switcher's own text, offered longest-first, and the last rung is a shape
+// only because two columns is all a narrow pane has left. Octicons has an
+// arrow-switch icon, but a set that changed the *label* would change what the
+// control says rather than which typeface says it.
 export const SWITCHER_LABELS = ["toggle view", "toggle", "⇄"] as const;
 
 /**

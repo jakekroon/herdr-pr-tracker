@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { glyphsFor, marksOf } from "../src/glyphs.ts";
 import { headline, parseSearch, PRECEDENCE, type PrRow } from "../src/model.ts";
 import {
   compactAge,
   compactRow,
-  CONFLICT_GLYPH,
-  DRAFT_GLYPH,
   ELLIPSIS,
   header,
-  LINKED_GLYPH,
   LOUD,
   relativeAge,
   render,
@@ -22,6 +20,9 @@ import {
 
 const live = parseSearch(await Bun.file("tests/fixtures/search.json").json());
 const states = parseSearch(await Bun.file("tests/fixtures/states.json").json());
+
+/** The set the widget draws when nothing is configured. */
+const UNI = glyphsFor("unicode");
 
 const NOW = 1_800_000_000_000;
 const opts = (over: Partial<RenderOpts> = {}): RenderOpts => ({
@@ -96,12 +97,12 @@ describe("renderRow", () => {
     // follows. A conflicted row spends it; every other row leaves it blank.
     const conflicted = plain(renderRow(pr(119), opts())[0]);
     const clean = plain(renderRow(pr(112), opts())[0]);
-    expect(conflicted).toContain(CONFLICT_GLYPH);
-    expect(clean).not.toContain(CONFLICT_GLYPH);
+    expect(conflicted).toContain(UNI.conflict);
+    expect(clean).not.toContain(UNI.conflict);
     // Mergeability GitHub has not computed yet paints nothing at all — the
     // no-news case has to be silent on the *line*, not merely false in the row.
-    expect(plain(renderRow(pr(122), opts())[0])).not.toContain(CONFLICT_GLYPH);
-    expect(plain(renderRow(pr(123), opts())[0])).not.toContain(CONFLICT_GLYPH);
+    expect(plain(renderRow(pr(122), opts())[0])).not.toContain(UNI.conflict);
+    expect(plain(renderRow(pr(123), opts())[0])).not.toContain(UNI.conflict);
     expect(vis(renderRow(pr(119), opts())[0])).toBe(44);
     // Same right edge, so the reserved cell is what pays for the glyph rather
     // than the cluster growing on the rows that carry one.
@@ -140,7 +141,7 @@ describe("renderRow", () => {
     // dim renders inconsistently — so the conflict shows without it.
     const line = renderRow(pr(120), opts())[0];
     expect(dimThroughout(line)).toBe(true);
-    expect(plain(line)).toContain(CONFLICT_GLYPH);
+    expect(plain(line)).toContain(UNI.conflict);
     expect(line).not.toContain(BOLD);
   });
 
@@ -164,7 +165,7 @@ describe("renderRow", () => {
 
   test("a draft carries the draft glyph and dims the whole row", () => {
     const [l1, l2] = renderRow(pr(108), opts());
-    expect(l1).toContain(DRAFT_GLYPH);
+    expect(l1).toContain(UNI.draft);
     expect(l1.startsWith("\x1b[2m")).toBe(true);
     expect(l2.startsWith("\x1b[2m")).toBe(true);
   });
@@ -187,8 +188,8 @@ describe("renderRow", () => {
   test("a workspace-linked row is marked, an unlinked one is not", () => {
     const linked = renderRow({ ...pr(100), linked: true }, opts())[0];
     const plain = renderRow({ ...pr(100), linked: false }, opts())[0];
-    expect(linked).toContain(LINKED_GLYPH);
-    expect(plain).not.toContain(LINKED_GLYPH);
+    expect(linked).toContain(UNI.linked);
+    expect(plain).not.toContain(UNI.linked);
     // Both start names on the same column.
     expect(vis(linked)).toBe(vis(plain));
   });
@@ -662,5 +663,138 @@ describe("notice", () => {
   test("is clipped to the pane width like every other line", () => {
     const out = render(live.rows, opts({ rows: 40, cols: 14, notice: NOTICE }));
     expect(width(out.at(-1)!)).toBeLessThanOrEqual(14);
+  });
+});
+
+describe("glyph sets in the pane", () => {
+  // Every mark the *lead* and the cluster's fixed cells can draw at once.
+  // Built rather than taken from a fixture: no real pull request carries all of
+  // them, and this asserts arithmetic rather than precedence.
+  //
+  // It cannot carry them all even so — `review` and `ci` are one value each, so
+  // a single row leaves four marks unrendered. The width test below loops over
+  // both cells for that reason; a mark that only ever appears on a row nothing
+  // measures is a mark whose width is untested.
+  const loaded: PrRow = {
+    owner: "acme",
+    repo: "web-app",
+    number: 21288,
+    title: "Every mark at once",
+    url: "https://github.com/acme/web-app/pull/21288",
+    branch: "feature/every-mark",
+    author: "someone",
+    isDraft: true,
+    createdAt: new Date(NOW - 86_400_000).toISOString(),
+    review: "CHANGES_REQUESTED",
+    ci: "fail",
+    conflict: true,
+    unresolved: 3,
+    unresolvedCapped: false,
+    linked: true,
+    reason: "involved",
+  };
+
+  const SETS = ["unicode", "nerd"] as const;
+
+  const REVIEWS = [null, "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"] as const;
+  const CIS = ["none", "pass", "fail", "pending"] as const;
+
+  test("a fully loaded row still lands exactly on the pane width, whichever mark it carries", () => {
+    for (const glyphs of SETS) {
+      for (const view of ["authored", "inbound"] as const) {
+        for (const cols of [28, 44, 80]) {
+          for (const review of REVIEWS) {
+            for (const ci of CIS) {
+              const row = { ...loaded, review, ci };
+              const [line1] = renderRow(row, opts({ cols, view, glyphs }));
+              const where = `${glyphs}/${view}/${cols}/${review}/${ci}`;
+              expect(`${where}=${width(line1)}`).toBe(`${where}=${cols}`);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Every mark the set has, actually painted by the renderer. Without this the
+  // review and CI marks the loaded row cannot carry — and the all-clear mark,
+  // which only an *empty* pane draws — were reachable only through `glyphsFor`,
+  // which is the module under test rather than the surface that uses it.
+  test("every mark in the set reaches the pane", () => {
+    for (const glyphs of SETS) {
+      const g = glyphsFor(glyphs);
+      const painted = new Set<string>();
+      for (const review of REVIEWS) {
+        for (const ci of CIS) {
+          for (const view of ["authored", "inbound"] as const) {
+            for (const l of renderRow({ ...loaded, review, ci }, opts({ cols: 80, view, glyphs }))) {
+              for (const ch of plain(l)) painted.add(ch);
+            }
+          }
+        }
+      }
+      for (const l of render([], opts({ rows: 10, glyphs, fetchedAt: NOW, notice: "x" }))) {
+        for (const ch of plain(l)) painted.add(ch);
+      }
+      for (const [what, mark] of Object.entries(marksOf(g))) {
+        // The sidebar owns `refreshing`; the pane never draws it.
+        if (what === "refreshing") continue;
+        expect(`${glyphs}.${what} painted=${painted.has(mark)}`)
+          .toBe(`${glyphs}.${what} painted=true`);
+      }
+    }
+  });
+
+  test("the all-clear mark comes from the set", () => {
+    const empty = (glyphs: "unicode" | "nerd") =>
+      render([], opts({ rows: 10, glyphs, fetchedAt: NOW })).map(plain).join("\n");
+    expect(empty("unicode")).toContain(`${glyphsFor("unicode").clear} all clear`);
+    expect(empty("nerd")).toContain(`${glyphsFor("nerd").clear} all clear`);
+    expect(empty("nerd")).not.toContain(glyphsFor("unicode").clear);
+  });
+
+  test("the cluster costs the same columns in either set", () => {
+    // If the two sets cost different widths, the branch name they leave room
+    // for differs — which is the symptom a width regression actually shows.
+    for (const view of ["authored", "inbound"] as const) {
+      const [a] = renderRow(loaded, opts({ cols: 30, view, glyphs: "unicode" }));
+      const [b] = renderRow(loaded, opts({ cols: 30, view, glyphs: "nerd" }));
+      const branchOf = (l: string) => /feature\/[a-z-]*/.exec(l)?.[0] ?? "";
+      expect(branchOf(b)).toBe(branchOf(a));
+    }
+  });
+
+  test("the nerd set actually replaces the marks", () => {
+    const [uni] = renderRow(loaded, opts({ view: "inbound", glyphs: "unicode" }));
+    const [nerd] = renderRow(loaded, opts({ view: "inbound", glyphs: "nerd" }));
+    for (const mark of ["⊘", "✗", "⚑", "▪", "◌", "◦"]) {
+      expect(`unicode has ${mark}: ${uni.includes(mark)}`)
+        .toBe(`unicode has ${mark}: true`);
+      expect(`nerd has ${mark}: ${nerd.includes(mark)}`)
+        .toBe(`nerd has ${mark}: false`);
+    }
+  });
+
+  test("an unset glyph option draws exactly what it always drew", () => {
+    expect(renderRow(loaded, opts({ view: "inbound" })))
+      .toEqual(renderRow(loaded, opts({ view: "inbound", glyphs: "unicode" })));
+  });
+
+  test("the notice takes its warning mark from the set", () => {
+    const note = "2 bad IGNORE_REPOS entries";
+    const out = render(live.rows, opts({ rows: 40, notice: note, glyphs: "nerd" }));
+    expect(out.some((l) => l.includes(glyphsFor("unicode").notice))).toBe(false);
+    expect(out.some((l) => l.includes(glyphsFor("nerd").notice))).toBe(true);
+  });
+
+  test("the whole pane stays inside its width in either set", () => {
+    for (const glyphs of SETS) {
+      for (const cols of [20, 30, 44, 80]) {
+        for (const line of render(live.rows, opts({ rows: 40, cols, glyphs }))) {
+          expect(`${glyphs}/${cols}: ${width(line)} <= ${cols}`)
+            .toBe(`${glyphs}/${cols}: ${Math.min(width(line), cols)} <= ${cols}`);
+        }
+      }
+    }
   });
 });

@@ -108,6 +108,7 @@ function paint() {
     error,
     pollSeconds: cfg.pollSeconds,
     colour: cfg.colour,
+    glyphs: cfg.glyphs,
     view,
     // `auto` spends the ten columns on an owner prefix only once a second
     // owner is actually present.
