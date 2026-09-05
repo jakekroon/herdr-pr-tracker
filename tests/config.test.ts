@@ -228,3 +228,23 @@ describe("ignoreNotice", () => {
     }
   });
 });
+
+describe("GLYPHS", () => {
+  test("defaults to the unicode set, so an unconfigured widget is unchanged", () => {
+    expect(DEFAULTS.glyphs).toBe("unicode");
+  });
+
+  test("reads the documented names", () => {
+    expect(parseConfig("GLYPHS=nerd")).toEqual({ glyphs: "nerd" });
+    expect(parseConfig("GLYPHS=unicode")).toEqual({ glyphs: "unicode" });
+  });
+
+  // The same rule SHOW_OWNER follows: an unrecognised value is left out of the
+  // partial entirely, so the default survives rather than being overwritten
+  // with something the renderer cannot draw.
+  test("refuses a name it does not know rather than guessing", () => {
+    for (const bad of ["GLYPHS=octicons", "GLYPHS=Nerd", "GLYPHS=ascii", "GLYPHS="]) {
+      expect(parseConfig(bad)).toEqual({});
+    }
+  });
+});

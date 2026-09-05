@@ -15,9 +15,11 @@
 # `KEY=value`, one per line, `#` comments a line out. A value may be quoted or
 # bare; a matched pair of single or double quotes is stripped.
 #
-# Glyphs, colours, signal precedence and sort order are deliberately NOT
-# configurable. A widget whose meaning depends on settings is a widget you have
-# to remember the settings of before you can read it.
+# Signal precedence and sort order are deliberately NOT configurable, and
+# neither is what any mark means. A widget whose meaning depends on settings is
+# a widget you have to remember the settings of before you can read it. GLYPHS
+# and COLOR are not exceptions to that: they say what this terminal can draw,
+# not what a row means.
 
 # Seconds between GitHub polls. Rate-limit cost is charged per `search` field
 # rather than per pull request, so a poll costs the same whatever comes back —
@@ -104,6 +106,39 @@
 # Set to 0/off/false/no to render without colour, leaving the glyphs to carry
 # the state. `COLOUR` is accepted as well, and `COLOR` wins if both are set.
 #COLOR=on
+
+# unicode | nerd. Which set of marks the pane and the sidebar draw. Both sets
+# answer the same questions in the same cells at the same widths — this picks a
+# typeface, not a vocabulary.
+#
+# `unicode` is the default and needs no font installed. It is also the reason
+# this setting exists: those marks are geometric shapes and dingbats, and most
+# monospace fonts do not have them. Of the eleven, Monaco — macOS's default —
+# has exactly one, so the other ten are drawn by OS font fallback out of
+# whatever proportional font happens to have them, which is why they can look
+# like they came from different typefaces. They did.
+#
+# `nerd` draws Octicons, GitHub's own icon set, from the Nerd Fonts private-use
+# block. It needs a font that has them:
+#
+#   Ghostty      nothing to do — it embeds Symbols Nerd Font 3.4.0 in the binary
+#   iTerm2       brew install --cask font-symbols-only-nerd-font, then
+#                Profiles > Text > "Use a different font for non-ASCII text"
+#   elsewhere    any patched Nerd Font as the terminal font
+#
+# A missing glyph is a blank cell, not an error, so check the pane after
+# switching. `nerd` also says one thing `unicode` cannot: a review verdict and a
+# build result get separate marks, where `unicode` spends `✓` on both a passing
+# build and an approval.
+#
+# Write the name in lower case. An unrecognised name — `Nerd`, `octicons`, a
+# typo — is ignored and the default stands, because painting blank cells over a
+# misspelling is worse than ignoring it.
+#
+# The pane reads this file once, at startup, and reloading the plugin does not
+# restart the pane process. Close the widget after changing it:
+# `herdr plugin pane close <pane-id>`.
+#GLYPHS=unicode
 
 # Minimum seconds between sidebar-token lookups for a single pane. Focus events
 # fire far more often than a PR's state changes, and each lookup is two `gh`

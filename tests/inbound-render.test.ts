@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { glyphsFor } from "../src/glyphs.ts";
 import { parseInbound, type PrRow } from "../src/model.ts";
 import {
   compactRow,
   ELLIPSIS,
   header,
-  INVOLVED_GLYPH,
   leadWidth,
   render,
   renderRow,
@@ -16,6 +16,9 @@ import { groupRows } from "../src/render.ts";
 import { SWITCHER_LABELS, VIEW_TITLE, viewUrl } from "../src/view.ts";
 
 const list = parseInbound(await Bun.file("tests/fixtures/inbound.json").json());
+/** The set the widget draws when nothing is configured. */
+const UNI = glyphsFor("unicode");
+
 const NOW = Date.parse("2026-08-25T09:00:00Z");
 
 const opts = (over: Partial<RenderOpts> = {}): RenderOpts => ({
@@ -150,13 +153,13 @@ describe("the lead", () => {
   });
 
   test("marks an involved row and leaves a reviewer row silent", () => {
-    expect(plain(renderRow(pr(105), opts())[0])).toContain(INVOLVED_GLYPH);
-    expect(plain(renderRow(pr(101), opts())[0])).not.toContain(INVOLVED_GLYPH);
+    expect(plain(renderRow(pr(105), opts())[0])).toContain(UNI.involved);
+    expect(plain(renderRow(pr(101), opts())[0])).not.toContain(UNI.involved);
   });
 
   test("never appears in the authored view", () => {
     const line = plain(renderRow({ ...pr(105) }, opts({ view: "authored" }))[0]);
-    expect(line).not.toContain(INVOLVED_GLYPH);
+    expect(line).not.toContain(UNI.involved);
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { glyphsFor } from "../src/glyphs.ts";
 import {
   parsePrNumber,
   refreshingLabel,
@@ -70,5 +71,46 @@ describe("resolvePaneCwd", () => {
   });
   test("no directory at all is undefined, not a guess", () => {
     expect(resolvePaneCwd({})).toBeUndefined();
+  });
+});
+
+describe("the sidebar token follows the configured glyph set", () => {
+  const state = { number: 21288, ci: "pass" as const, isDraft: true };
+
+  test("an unset set draws exactly what it always drew", () => {
+    expect(tokenLabel(state)).toBe(tokenLabel(state, "unicode"));
+    expect(tokenLabel(state)).toBe("◌#21288 ✓");
+  });
+
+  test("the nerd set replaces both the draft mark and the build mark", () => {
+    const label = tokenLabel(state, "nerd");
+    expect(label).toContain("#21288");
+    for (const mark of ["◌", "✓"]) expect(label).not.toContain(mark);
+    expect(label).toContain(glyphsFor("nerd").draft);
+    expect(label).toContain(glyphsFor("nerd").ci.pass);
+  });
+
+  test("no checks still spends no columns on a mark", () => {
+    for (const set of ["unicode", "nerd"] as const) {
+      expect(tokenLabel({ number: 7, ci: "none", isDraft: false }, set)).toBe("#7");
+    }
+  });
+
+  test("the refreshing label follows the set too", () => {
+    expect(refreshingLabel("#21288 ✓")).toBe("#21288 ⟳");
+    expect(refreshingLabel("#21288 ✓", false, "nerd"))
+      .toBe(`#21288 ${glyphsFor("nerd").refreshing}`);
+  });
+
+  // The invariant CLAUDE.md records: the pane and the sidebar are two surfaces
+  // showing the same facts, so a set that renamed a mark on one of them would
+  // let them disagree about what a glyph means.
+  test("draws the same build marks the pane does", () => {
+    for (const set of ["unicode", "nerd"] as const) {
+      for (const ci of ["pass", "fail", "pending"] as const) {
+        expect(tokenLabel({ number: 1, ci, isDraft: false }, set))
+          .toBe(`#1 ${glyphsFor(set).ci[ci]}`);
+      }
+    }
   });
 });

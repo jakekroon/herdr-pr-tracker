@@ -4,6 +4,8 @@
 // in *this* pane?" rather than "what is the state of everything I have open?".
 // Both surfaces use the same glyphs so they can never appear to disagree.
 
+import { type GlyphSet, type Glyphs, glyphsFor } from "./glyphs.ts";
+
 /** Buckets `gh pr checks --json bucket` reports. */
 export type Bucket = "pass" | "fail" | "pending" | "skipping" | "cancel";
 
@@ -26,17 +28,16 @@ export function rollupBuckets(buckets: string[]): TokenCi {
   return "none";
 }
 
-const CI_GLYPH: Record<TokenCi, string> = {
-  pass: "✓",
-  fail: "✗",
-  pending: "●",
-  none: "",
-};
-
-/** Shown in place of the CI glyph while a lookup is in flight, so the sidebar
- * visibly acknowledges the work instead of appearing stuck. */
-export const REFRESHING = "⟳";
-export const DRAFT = "◌";
+/** The marks come from `src/glyphs.ts`, the same source the pane draws from,
+ * so the two surfaces cannot end up meaning different things by one glyph.
+ *
+ * `none` is the one state they genuinely differ on and so is not in the set:
+ * the pane reserves a column for a build result whether or not there is one,
+ * to keep its cluster aligned down the page, and the sidebar — one token wide,
+ * with nothing to align against — spends nothing. */
+function ciMark(ci: TokenCi, g: Glyphs): string {
+  return ci === "none" ? "" : g.ci[ci];
+}
 
 export interface TokenState {
   number: number;
@@ -45,16 +46,22 @@ export interface TokenState {
 }
 
 /** `◌#21288 ✓` — draft marker, number, CI glyph. */
-export function tokenLabel(s: TokenState): string {
-  const glyph = CI_GLYPH[s.ci];
-  return `${s.isDraft ? DRAFT : ""}#${s.number}${glyph ? ` ${glyph}` : ""}`;
+export function tokenLabel(s: TokenState, glyphs?: GlyphSet): string {
+  const g = glyphsFor(glyphs);
+  const glyph = ciMark(s.ci, g);
+  return `${s.isDraft ? g.draft : ""}#${s.number}${glyph ? ` ${glyph}` : ""}`;
 }
 
 /** Keep the number on screen while a refresh runs; only the glyph changes. */
-export function refreshingLabel(previous: string | undefined, isDraft = false): string | null {
+export function refreshingLabel(
+  previous: string | undefined,
+  isDraft = false,
+  glyphs?: GlyphSet,
+): string | null {
   const n = parsePrNumber(previous);
   if (n == null) return null;
-  return `${isDraft ? DRAFT : ""}#${n} ${REFRESHING}`;
+  const g = glyphsFor(glyphs);
+  return `${isDraft ? g.draft : ""}#${n} ${g.refreshing}`;
 }
 
 /** Recover the PR number from a label we previously wrote. */

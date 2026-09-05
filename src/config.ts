@@ -1,7 +1,18 @@
-// Configuration is deliberately small. Glyphs, colours, precedence and sort
-// order are not configurable: a widget whose meaning depends on settings is a
-// widget you have to remember the settings of before you can read it.
+// Configuration is deliberately small. What a row *means* is not configurable:
+// precedence, colour and sort order are fixed, because a widget whose meaning
+// depends on settings is a widget you have to remember the settings of before
+// you can read it.
+//
+// `GLYPHS` is not an exception to that rule, and is worth saying why. It
+// chooses a typeface for the marks, not a vocabulary: both sets answer the same
+// questions in the same cells at the same widths, and a reader who knows what a
+// row means in one knows what it means in the other. It exists because the
+// marks are only drawable if the terminal's font has them — of the eleven,
+// Monaco, macOS's default, has exactly one — so the set is a fact about the
+// machine rather than a preference about the widget. `COLOR` is off the same
+// shelf: it turns escapes off for a surface that cannot show them.
 
+import { DEFAULT_GLYPHS, type GlyphSet, isGlyphSet } from "./glyphs.ts";
 import { join } from "node:path";
 import { DEFAULT_SEARCH, type IgnoreEntry } from "./query.ts";
 
@@ -12,6 +23,8 @@ export interface Config {
   /** "auto" shows the owner only when a PR's owner is not the common one. */
   showOwner: "auto" | "always" | "never";
   colour: boolean;
+  /** Which set of marks the pane and the sidebar draw. */
+  glyphs: GlyphSet;
   /** Minimum seconds between per-pane sidebar-token lookups. */
   tokenThrottleSeconds: number;
   /** Repositories and owners whose pull requests are never fetched, in either
@@ -29,6 +42,7 @@ export const DEFAULTS: Config = {
   maxPrs: 100,
   showOwner: "auto",
   colour: true,
+  glyphs: DEFAULT_GLYPHS,
   tokenThrottleSeconds: 30,
   ignore: [],
   ignoreDropped: [],
@@ -166,6 +180,10 @@ export function parseConfig(text: string): Partial<Config> {
   if (out.SHOW_OWNER === "always" || out.SHOW_OWNER === "never" || out.SHOW_OWNER === "auto") {
     cfg.showOwner = out.SHOW_OWNER;
   }
+  // Strict, and silent about a refusal: an unknown name leaves the key out of
+  // the partial entirely, so the default survives. Drawing blank cells because
+  // a name was misspelled is the one outcome worth ruling out.
+  if (out.GLYPHS != null && isGlyphSet(out.GLYPHS)) cfg.glyphs = out.GLYPHS;
   if (out.IGNORE_REPOS != null) {
     const { entries, dropped } = parseIgnoreList(out.IGNORE_REPOS);
     cfg.ignore = entries;

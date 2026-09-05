@@ -2,13 +2,8 @@
 // caller passes `now`, so every width, truncation and colour rule below is
 // deterministic and tested offline by tests/render.test.ts.
 
-import {
-  type CiState,
-  headline,
-  type PrRow,
-  type ReviewDecision,
-  type Signal,
-} from "./model.ts";
+import { type GlyphSet, type Glyphs, glyphsFor } from "./glyphs.ts";
+import { headline, type PrRow, type Signal } from "./model.ts";
 import { DEFAULT_VIEW, otherView, SWITCHER_LABELS, type View, viewUrl } from "./view.ts";
 
 const ESC = "\x1b";
@@ -64,36 +59,10 @@ export const LOUD: Signal[] = [
   "unresolved",
 ];
 
-// CI glyphs are inherited verbatim from the gh-pr plugin this replaces, so the
-// two surfaces never disagree about what ✓ means while both are installed.
-const CI_GLYPH: Record<CiState, string> = {
-  pass: "✓",
-  fail: "✗",
-  pending: "●",
-  none: " ",
-};
-
-const REVIEW_GLYPH: Record<Exclude<ReviewDecision, null>, string> = {
-  APPROVED: "✓",
-  CHANGES_REQUESTED: "✗",
-  REVIEW_REQUIRED: "◆",
-};
-
-/** The head cannot be merged into the base without a manual resolution.
- * Circle-based like `◌`/`◦`/`◆` rather than another cross: `✗` already means
- * two different things in this cluster (a review and a build), and a third
- * would make the column the only thing telling them apart. `⇄` was unavailable
- * — the narrow switcher label already owns it. */
-export const CONFLICT_GLYPH = "⊘";
-
-/** Marks a PR that has a live Herdr workspace open on its branch. */
-export const LINKED_GLYPH = "▪";
-export const DRAFT_GLYPH = "◌";
-/** Marks an inbound row nobody asked you to look at — assigned, mentioned, or
- * you left a comment. Silent for a reviewer row, which is the ordinary reason
- * to be in the view. Geometric like the rest of the set, and paired with `▪`
- * on purpose: it is the same shape, hollow. */
-export const INVOLVED_GLYPH = "◦";
+// Every mark the rows carry lives in `src/glyphs.ts`, in two sets the reader
+// chooses between. The two below are not marks: they are punctuation the
+// layout is built out of, they mean the same thing in any set, and both are in
+// the plainest monospace font there is.
 export const ELLIPSIS = "…";
 /** The dim filler that carries a repository heading out to the right edge, so
  * a group reads as a band rather than as one more line of text. */
@@ -133,6 +102,9 @@ export interface RenderOpts {
   colour: boolean;
   /** Show `owner/repo` instead of `repo`. */
   showOwner: boolean;
+  /** Which marks to draw. Defaults to the unicode set, so every existing
+   * caller means what it always did. */
+  glyphs?: GlyphSet;
   /** PRs matching the search but not fetched (the `first:` cap). */
   omitted?: number;
   /** Which pull requests the pane is listing. Defaults to the authored view,
@@ -272,14 +244,21 @@ export function hitAt(targets: HitTarget[], row: number, col: number): HitTarget
 /** The right-hand status cluster, fixed-width so it aligns down the pane.
  * Returns the plain glyphs and their painted form separately, because the
  * caller needs the visible width to lay out the line. */
-function cluster(row: PrRow, colour: boolean): { plain: string; painted: string } {
+function cluster(
+  row: PrRow,
+  colour: boolean,
+  g: Glyphs,
+): { plain: string; painted: string } {
   const flag = row.unresolved > 0
-    ? `⚑${row.unresolvedCapped ? "99+" : String(row.unresolved)}`
+    ? `${g.unresolved}${row.unresolvedCapped ? "99+" : String(row.unresolved)}`
     : "";
-  // 4 columns holds ⚑ plus a three-digit count or the 99+ floor.
+  // 4 columns holds the mark plus a three-digit count or the 99+ floor.
   const flagCell = flag.padEnd(4, " ");
-  const reviewCell = row.review ? REVIEW_GLYPH[row.review] : " ";
-  const ciCell = CI_GLYPH[row.ci];
+  const reviewCell = row.review ? g.review[row.review] : " ";
+  // A column is reserved for the build result whether or not there is one, so
+  // the cluster keeps aligning; the sidebar spends none, which is why `none` is
+  // not in the set and each surface answers for itself.
+  const ciCell = row.ci === "none" ? " " : g.ci[row.ci];
   // Reserved on every row whether or not it conflicts, so the cluster keeps
   // aligning down the pane — the same trade the band's count cell makes. It
   // costs two columns of branch name on every row in both views, which is what
@@ -287,7 +266,7 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
   // and CI cells have held the last two columns since the plugin this one
   // replaces, and moving what lives at the edge would cost more than the
   // columns do.
-  const conflictCell = row.conflict ? CONFLICT_GLYPH : " ";
+  const conflictCell = row.conflict ? g.conflict : " ";
 
   // Two columns, not one: every other glyph in this cluster is separated from
   // its neighbour — the review cell by an explicit space, the CI cell by the
@@ -326,7 +305,13 @@ function cluster(row: PrRow, colour: boolean): { plain: string; painted: string 
 
 /** Frames for the pre-first-fetch spinner. Ten of them, advanced once per
  * second, because the pane repaints once per second: a faster cadence would
- * only ever show every Nth frame and read as a stutter. */
+ * only ever show every Nth frame and read as a stutter.
+ *
+ * Deliberately *not* in `glyphs.ts`, though braille is font fallback on Monaco
+ * like the marks are: Octicons is a set of icons and has no ten-frame
+ * animation to swap in, so `GLYPHS=nerd` would have nothing to offer here. A
+ * spinner is also not a mark — it says "no answer yet" rather than naming a
+ * fact about a pull request, and it is gone the moment the first fetch lands. */
 export const SPINNER = [..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"];
 
 /** Which frame `now` falls on. Pure, so the header stays testable. */
@@ -550,15 +535,16 @@ function branchLine(
 ): string {
   const inbound = o.view === "inbound";
   const sig = headline(row, o.view);
-  const { plain, painted } = cluster(row, o.colour);
+  const g = glyphsFor(o.glyphs);
+  const { plain, painted } = cluster(row, o.colour, g);
 
   // Three columns: workspace marker, draft marker, separator — four in the
   // inbound view, which adds the involved mark. Fixed width so identities start
   // on the same column whether or not a row carries any of them, and indented
   // past the repository heading above them.
-  const lead = `${row.linked ? LINKED_GLYPH : " "}` +
-    `${row.isDraft ? DRAFT_GLYPH : " "}` +
-    (inbound ? `${row.reason === "involved" ? INVOLVED_GLYPH : " "}` : "") +
+  const lead = `${row.linked ? g.linked : " "}` +
+    `${row.isDraft ? g.draft : " "}` +
+    (inbound ? `${row.reason === "involved" ? g.involved : " "}` : "") +
     " ";
 
   // What the row leads with. Your own branch names are how you think about your
@@ -702,7 +688,7 @@ function noticeLine(o: RenderOpts): string | null {
   // The glyph and the space after it are the two columns the message does not get.
   const text = clip(o.notice, room - 2);
   if (text.length === 0) return null;
-  return indentFor(o) + paint("⚠", "yellow", o.colour) +
+  return indentFor(o) + paint(glyphsFor(o.glyphs).notice, "yellow", o.colour) +
     dim(` ${text}`, o.colour);
 }
 
@@ -757,7 +743,10 @@ export function render(rows: PrRow[], o: RenderOpts): string[] {
     // is empty because nothing has been asked yet, and "all clear" under a
     // spinner claims an answer nobody has.
     if (budget > 0 && o.fetchedAt != null) {
-      out.push(indentFor(o) + paint("✓", "green", o.colour) + dim(" all clear", o.colour));
+      out.push(
+        indentFor(o) + paint(glyphsFor(o.glyphs).clear, "green", o.colour) +
+          dim(" all clear", o.colour),
+      );
     }
     if (notice) out.push(notice);
     return out.slice(0, o.rows);
