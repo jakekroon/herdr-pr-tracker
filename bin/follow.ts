@@ -87,17 +87,26 @@ async function layout(paneId?: string): Promise<Layout | null> {
  * what stops a stale id being acted on: a `pane move` aimed at a closed plugin
  * pane succeeds *and* respawns the pane under a new id, so believing the move
  * left the old id recorded and the same bogus move ran on every hook.
+ *
+ * The write is unconditional. It used to be skipped when the kept id matched the
+ * one the caller passed in — but the post-move caller passes the id the move
+ * just handed back, which is by construction the id adoption finds, so the write
+ * never ran and the file kept the *pre-move* id. Measured 2026-09-16 across six
+ * placements: the recorded id was one placement behind on every one. `main`'s
+ * settled fast path matches on that id, so it never matched, every focus event
+ * took the lock and walked a full move-and-resize, and the width-drag recording
+ * that only the settled path performs never ran at all.
  */
-async function reconcile(tabId: string | undefined, known: string | null): Promise<string | null> {
+async function reconcile(tabId: string | undefined): Promise<string | null> {
   const plan = adoptWidget(await listPanes(), WIDGET_LABEL, tabId);
   if (!plan) {
     // Nothing is on screen, so whatever was recorded is a ghost. Clearing it
     // means the open below is a plain open rather than a move of a dead pane.
-    if (known) await clearPaneId();
+    await clearPaneId();
     return null;
   }
   for (const orphan of plan.close) await closePluginPane(orphan);
-  if (plan.keep !== known) await writePaneId(plan.keep);
+  await writePaneId(plan.keep);
   return plan.keep;
 }
 
@@ -167,12 +176,12 @@ async function widthLeftBehind(paneId: string): Promise<number | null> {
   return usableRatio(paneRatio(there.rect.width, home.area?.width ?? 0));
 }
 
-async function place(l: Layout, stored: number | null, recorded: string | null): Promise<number> {
+async function place(l: Layout, stored: number | null): Promise<number> {
   let desired = stored ?? DEFAULT_WIDTH_RATIO;
 
   // The recorded id is absent from this tab: either the widget is in another
   // tab, or the id is stale. Both are answered by looking at what exists.
-  const known = await reconcile(l.tab_id, recorded);
+  const known = await reconcile(l.tab_id);
 
   // Adoption found it already here — Herdr reopened it after a plugin reload, or
   // a previous run placed it without recording. It keeps its place; the
@@ -218,7 +227,7 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
     // than believed: a widget in this tab afterwards means the move landed.
     if (moved) {
       const after = await layout();
-      const placed = after ? await reconcile(after.tab_id, moved) : null;
+      const placed = after ? await reconcile(after.tab_id) : null;
       if (placed && after?.panes.some((p) => p.pane_id === placed)) {
         // Corrective only. With the complement ratio the widget arrives at its
         // final width and this finds nothing to do; it earns its keep when the
@@ -297,7 +306,7 @@ async function main(): Promise<number> {
   if (!(await takePlacementLock())) return 0;
   let code: number;
   try {
-    code = await place(l, stored, recorded);
+    code = await place(l, stored);
   } finally {
     releasePlacementLock();
   }
