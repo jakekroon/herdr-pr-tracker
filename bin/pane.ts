@@ -24,6 +24,8 @@ import {
 } from "../src/state.ts";
 import { otherView, type View, VIEW_TITLE, viewUrl } from "../src/view.ts";
 import { WIDGET_LABEL } from "../src/dock.ts";
+import { followFocus } from "../src/follow.ts";
+import { watchFocus } from "../src/watch.ts";
 import { collectOpenBranches, linkRows } from "../src/workspaces.ts";
 
 const PLUGIN_ROOT = process.env.HERDR_PLUGIN_ROOT ?? dirname(import.meta.dir);
@@ -376,6 +378,62 @@ paint();
 await titlePane(view);
 
 await refresh(view);
+
+// --- following ---------------------------------------------------------------
+
+/**
+ * Keep the widget in the tab the user is looking at.
+ *
+ * A poll, because Herdr 0.9.0 leaves nothing else to listen to — `src/watch.ts`
+ * carries the measurement. It runs here rather than in a daemon for two
+ * reasons: the pane process is the one part of a plugin allowed to stay alive,
+ * and its lifetime is the right one, since a widget that is not on screen has
+ * nothing to keep docked.
+ *
+ * Not awaited. The render loop below owns the foreground.
+ */
+void watchFocus({
+  sample: async () => {
+    const panes = await listPanes();
+    // `listPanes` returns an empty array for a failed call as well as for an
+    // empty session, and only the first is possible here — this process is
+    // itself a pane. So empty means the query failed, which is a blip to skip
+    // rather than an answer to act on.
+    if (panes.length === 0) return null;
+    const focused = panes.find((p) => p.focused);
+    return { tabId: focused?.tab_id ?? null, paneId: focused?.pane_id ?? null };
+  },
+  // `"focused"` and never `"current"`: `pane layout --current` resolves from
+  // this process's own `HERDR_PANE_ID`, which is the id the widget was launched
+  // with and which every cross-tab move has since invalidated.
+  onTabChanged: async () => {
+    await followFocus("focused");
+  },
+  // The `$pr` token, which `pane.focused` used to hook. Spawned rather than
+  // called: `bin/token.ts` is a script, and its own per-pane throttle is what
+  // stops a poll this frequent turning into a pair of `gh` calls per tick —
+  // hence the synthetic event marker, which is how it recognises an automatic
+  // invocation rather than a deliberate one.
+  onPaneChanged: async (paneId) => {
+    const p = Bun.spawn(["bun", join(PLUGIN_ROOT, "bin/token.ts")], {
+      env: {
+        ...process.env,
+        HERDR_PANE_ID: paneId,
+        HERDR_PLUGIN_EVENT: "pane.focused",
+        HERDR_PLUGIN_EVENT_JSON: JSON.stringify({
+          event: "pane_focused",
+          data: { type: "pane_focused", pane_id: paneId },
+        }),
+      },
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    await p.exited;
+  },
+  sleep: (ms) => Bun.sleep(ms),
+  now: () => Date.now(),
+  running: () => true,
+});
 
 while (true) {
   // The age in the header ticks every second; the network is only touched on

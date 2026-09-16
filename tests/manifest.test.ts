@@ -6,6 +6,7 @@
 // packaging bugs it exists to catch would have shipped.
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { ENTRYPOINT } from "../src/follow.ts";
 import { VIEWS, viewUrl } from "../src/view.ts";
 
 const manifest = Bun.TOML.parse(await Bun.file("herdr-plugin.toml").text()) as {
@@ -47,10 +48,12 @@ for (const cmd of commands) {
 }
 
 // Every pane entrypoint referenced from code must exist in the manifest.
+// Imported rather than read out of the source: the constant is what `follow`
+// actually passes to `plugin pane open`, and a regex over a file only ever
+// agrees with it by luck — it went stale the moment the constant moved module.
 const paneIds = new Set((manifest.panes ?? []).map((p) => p.id));
-const follow = await Bun.file("bin/follow.ts").text();
-const entrypoint = follow.match(/ENTRYPOINT = "([^"]+)"/)?.[1];
-if (!entrypoint || !paneIds.has(entrypoint)) {
+const entrypoint = ENTRYPOINT;
+if (!paneIds.has(entrypoint)) {
   problems.push(`follow opens entrypoint "${entrypoint}", which the manifest does not declare`);
 }
 
@@ -133,5 +136,5 @@ test("the manifest declares the commands and handlers the plugin needs", () => {
   expect(commands.every((c) => c.length >= 2)).toBe(true);
   expect(manifest.link_handlers?.length).toBe(VIEWS.length);
   expect(widgetLabel).toBeTruthy();
-  expect(entrypoint).toBeTruthy();
+  expect(paneIds.has(entrypoint)).toBe(true);
 });

@@ -158,15 +158,16 @@ export async function clearPlacedRatio(): Promise<void> {
  * Serialise placement across concurrent runs.
  *
  * `tab.focused` and `workspace.focused` both run `follow`, and Herdr fires them
- * **together** — probed at 1ms apart, so two runs read the same layout, both
- * decide the widget needs placing, and both resize it. One nudge lands the width;
+ * **together** — probed at 1ms apart — while the watcher in the pane process
+ * polls underneath them. So two runs read the same layout, both decide the
+ * widget needs placing, and both resize it. One nudge lands the width;
  * two land somewhere unpredictable, which is what made a workspace change resize
  * the widget "weirdly".
  *
  * The loser exits rather than waiting. That is safe only because the winner
  * then *converges* instead of firing once: the paired hooks carry the same tab,
  * but a burst of workspace switches queues runs whose targets differ, and a
- * discarded loser is a discarded target. `bin/follow.ts` holds the lock across
+ * discarded loser is a discarded target. `src/follow.ts` holds the lock across
  * repeated placements until the focused tab is the one the widget is in — see
  * `placementOwed`.
  */
@@ -178,7 +179,8 @@ export async function takePlacementLock(): Promise<boolean> {
     // this one cannot, because "wx" is the atomic part and `Bun.write` has no
     // exclusive flag. So it has to make the directory itself. Without this, a
     // checkout Herdr has never run — `bun bin/follow.ts` by hand — ENOENTs on
-    // both writes below and `follow` exits 0 having placed nothing, silently.
+    // both writes below and `followFocus` exits 0 having placed nothing,
+    // silently.
     mkdirSync(dirname(path), { recursive: true });
     // "wx" fails if the file exists, which is the atomic part.
     writeFileSync(path, `${now}\n`, { flag: "wx" });

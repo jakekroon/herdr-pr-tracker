@@ -193,7 +193,7 @@ export function shouldRecordWidth(
  * The label Herdr gives the widget pane, taken from the manifest's
  * `[[panes]].title`, and the discriminator `adoptWidget` matches on.
  *
- * It lives here rather than in `bin/follow.ts` because the pane process needs
+ * It lives here rather than in `src/follow.ts` because the pane process needs
  * it too: the widget has to find *itself* in `pane list` to set its title, and
  * `HERDR_PANE_ID` cannot answer that — it is the id the process was launched
  * with, and a cross-tab move renames the pane without telling the process
