@@ -7,6 +7,7 @@ import {
   paneRatio,
   lockIsStale,
   moveRatio,
+  placementOwed,
   ratioChanged,
   shouldRecordWidth,
   usableRatio,
@@ -263,6 +264,35 @@ describe("lockIsStale", () => {
 
   test("a stamp in the future is a clock change, not a live run", () => {
     expect(lockIsStale(2_000_000, 1_000_000)).toBe(true);
+  });
+});
+
+describe("placementOwed", () => {
+  // The burst, in one assertion. Five workspace switches in 68ms queue five
+  // runs; the winner places into the first target and the losers exit with the
+  // rest discarded. Measured 2026-09-16: the widget sat in the first event's
+  // tab while focus had settled on the fifth, and stayed there past the lock's
+  // 15s lease, because nothing re-checked after the winner's ~400ms walk.
+  test("a pass is owed when focus has moved on from the tab just placed into", () => {
+    expect(placementOwed("w2E:t1", "w7F:t1")).toBe(true);
+  });
+
+  // The anti-spin rule, and the reason it is this predicate rather than a
+  // retry count: the answer for a tab does not change between passes, so a tab
+  // that would not take the widget is never tried a second time.
+  test("no pass is owed once focus is the tab the widget was placed into", () => {
+    expect(placementOwed("w7F:t1", "w7F:t1")).toBe(false);
+  });
+
+  // A layout read that failed, or one Herdr reported without a tab id. Neither
+  // is evidence that focus moved, and placing again on no evidence is how a
+  // widget ends up somewhere nobody asked for.
+  test("an unreadable focused tab owes nothing", () => {
+    expect(placementOwed("w7F:t1", undefined)).toBe(false);
+  });
+
+  test("an unreadable placement tab owes nothing", () => {
+    expect(placementOwed(undefined, "w7F:t1")).toBe(false);
   });
 });
 

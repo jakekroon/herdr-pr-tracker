@@ -264,6 +264,35 @@ export function lockIsStale(heldSinceMs: number, nowMs: number, ttlMs = 15_000):
 }
 
 /**
+ * Whether a run that has just placed the widget still owes another pass.
+ *
+ * The lock above assumes the loser is redundant, and for the paired
+ * `tab.focused`/`workspace.focused` hooks it is: both carry the same tab. A
+ * **burst** breaks that assumption — five workspace switches in 68ms queue five
+ * runs, each carrying a *newer* target tab, and the winner's placement takes
+ * ~400ms, so every loser exits with its target discarded. Measured 2026-09-16
+ * over six bursts: five left the widget in the tab of the first or fourth event
+ * while focus had long since settled on the fifth, and it stayed there until the
+ * next unrelated focus change. One-shot placement has nothing that re-checks.
+ *
+ * So the winner keeps the lock and asks this after each pass. A pass is owed
+ * only when the focused tab is no longer the tab the widget was just placed
+ * into — which is also what stops a run spinning: a tab that will not take the
+ * widget is never tried twice, because the answer for it does not change.
+ *
+ * The caller has to source `focusedTabId` from live focus (`pane list`) rather
+ * than from `pane layout --current`, which inside a hook reports the tab the
+ * event fired for and keeps reporting it. Fed that, this always answers false.
+ */
+export function placementOwed(
+  placedTabId: string | undefined,
+  focusedTabId: string | undefined,
+): boolean {
+  if (!placedTabId || !focusedTabId) return false;
+  return placedTabId !== focusedTabId;
+}
+
+/**
  * The `--ratio` to hand `pane move`.
  *
  * **`--ratio` is the share the *target* pane keeps, not the share the moved pane

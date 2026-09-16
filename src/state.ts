@@ -163,8 +163,12 @@ export async function clearPlacedRatio(): Promise<void> {
  * two land somewhere unpredictable, which is what made a workspace change resize
  * the widget "weirdly".
  *
- * Only one run needs to converge, so the loser exits rather than waiting: the
- * winner is doing the identical work with the same inputs.
+ * The loser exits rather than waiting. That is safe only because the winner
+ * then *converges* instead of firing once: the paired hooks carry the same tab,
+ * but a burst of workspace switches queues runs whose targets differ, and a
+ * discarded loser is a discarded target. `bin/follow.ts` holds the lock across
+ * repeated placements until the focused tab is the one the widget is in — see
+ * `placementOwed`.
  */
 export async function takePlacementLock(): Promise<boolean> {
   const path = join(stateDir(), "placing.lock");

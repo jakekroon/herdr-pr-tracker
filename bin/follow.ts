@@ -18,7 +18,10 @@
 //     width is approached in steps that re-measure, never one computed jump.
 //
 // And placement is serialised: Herdr fires the two hooks above together, so two
-// runs would otherwise resize the same widget twice.
+// runs would otherwise resize the same widget twice. The run holding the lock
+// then keeps re-reading the focused tab until the widget is in it, because a
+// burst of switches queues runs whose targets differ and only the winner's
+// survives.
 
 import {
   adoptWidget,
@@ -27,6 +30,7 @@ import {
   type Layout,
   paneRatio,
   moveRatio,
+  placementOwed,
   ratioChanged,
   shouldRecordWidth,
   usableRatio,
@@ -62,6 +66,9 @@ const ENTRYPOINT = "prs";
 /** Cap on resize steps. The approach halves its step as it closes, so this is a
  * backstop against a layout that will not move, not a normal exit. */
 const MAX_WIDTH_STEPS = 12;
+/** Cap on placement passes in one run. `placementOwed` ends the loop; this is
+ * the backstop against a tab id that keeps changing under it. */
+const MAX_PLACEMENT_PASSES = 4;
 
 async function layout(paneId?: string): Promise<Layout | null> {
   try {
@@ -80,6 +87,23 @@ async function layout(paneId?: string): Promise<Layout | null> {
 }
 
 /**
+ * The layout of the tab focused *now*, rather than the tab this run fired for.
+ *
+ * Deliberately not `pane layout --current`. Probed 2026-09-16: `--current`
+ * resolves from the calling process's own `HERDR_PANE_ID`, so a hook is handed
+ * the tab its event was about and is handed the same tab however often it asks
+ * — focusing five other workspaces in between leaves the answer unchanged. A
+ * convergence loop built on `--current` re-reads the tab it started with and
+ * concludes it has nothing left to do, which is what the first attempt at this
+ * fix did: four green unit tests, six bursts, no change on screen. Exactly one
+ * pane in `pane list` carries `focused`, and that one moves with the user.
+ */
+async function focusedLayout(): Promise<Layout | null> {
+  const focused = (await listPanes()).find((p) => p.focused);
+  return focused ? await layout(focused.pane_id) : null;
+}
+
+/**
  * Find the widget as it actually is, keep one, and close any duplicate.
  *
  * Returns the id to work with, or null when no widget pane exists anywhere —
@@ -88,14 +112,15 @@ async function layout(paneId?: string): Promise<Layout | null> {
  * pane succeeds *and* respawns the pane under a new id, so believing the move
  * left the old id recorded and the same bogus move ran on every hook.
  *
- * The write is unconditional. It used to be skipped when the kept id matched the
- * one the caller passed in — but the post-move caller passes the id the move
- * just handed back, which is by construction the id adoption finds, so the write
- * never ran and the file kept the *pre-move* id. Measured 2026-09-16 across six
- * placements: the recorded id was one placement behind on every one. `main`'s
- * settled fast path matches on that id, so it never matched, every focus event
- * took the lock and walked a full move-and-resize, and the width-drag recording
- * that only the settled path performs never ran at all.
+ * The write is unconditional, and that is the fix for a second bug. It used to
+ * be skipped when the kept id matched the one the caller passed in — but the
+ * post-move caller passes the id the move just handed back, which is by
+ * construction the id adoption finds, so the write never ran and the file kept
+ * the *pre-move* id. Measured 2026-09-16 across six placements: the recorded id
+ * was one placement behind on every one. `main`'s settled fast path matches on
+ * that id, so it never matched, every focus event took the lock and walked a
+ * full move-and-resize, and the width-drag recording that only the settled path
+ * performs never ran at all.
  */
 async function reconcile(tabId: string | undefined): Promise<string | null> {
   const plan = adoptWidget(await listPanes(), WIDGET_LABEL, tabId);
@@ -226,14 +251,21 @@ async function place(l: Layout, stored: number | null): Promise<number> {
     // longer exists, so the id is still checked against a fresh layout rather
     // than believed: a widget in this tab afterwards means the move landed.
     if (moved) {
-      const after = await layout();
-      const placed = after ? await reconcile(after.tab_id) : null;
-      if (placed && after?.panes.some((p) => p.pane_id === placed)) {
-        // Corrective only. With the complement ratio the widget arrives at its
-        // final width and this finds nothing to do; it earns its keep when the
-        // target was too narrow to give up the columns.
-        await settleWidth(placed, desired);
-        return 0;
+      // Read the moved pane's own tab, not `--current`: `--current` is pinned to
+      // the tab this run fired for (see `focusedLayout`), so a later pass aiming
+      // at a different tab would measure its move against the first tab, find
+      // the widget absent, and treat a landed move as a failure — then close and
+      // reopen the widget, restarting the renderer for nothing.
+      const after = await layout(moved);
+      if (after && after.tab_id === l.tab_id) {
+        const placed = await reconcile(after.tab_id);
+        if (placed && after.panes.some((p) => p.pane_id === placed)) {
+          // Corrective only. With the complement ratio the widget arrives at its
+          // final width and this finds nothing to do; it earns its keep when the
+          // target was too narrow to give up the columns.
+          await settleWidth(placed, desired);
+          return 0;
+        }
       }
     }
     // It did not land and nothing was adopted, so the recorded pane is beyond
@@ -302,11 +334,22 @@ async function main(): Promise<number> {
 
   // Placing means moving and resizing, and the paired hooks arrive together. A
   // second run would resize the same widget a second time, landing it at a width
-  // neither run intended. The loser exits: the winner is doing identical work.
+  // neither run intended. So the loser exits rather than waiting, and the winner
+  // has to converge instead of firing once. The paired hooks carry the same tab,
+  // so there the loser is redundant — but a burst of workspace switches queues
+  // runs whose targets differ, and discarding a loser discards the tab you ended
+  // up in. The winner re-reads the focused tab after each placement, under the
+  // same lock, and places again while `placementOwed` says focus has moved on.
   if (!(await takePlacementLock())) return 0;
-  let code: number;
+  let code = 0;
   try {
-    code = await place(l, stored);
+    let target = l;
+    for (let pass = 0; pass < MAX_PLACEMENT_PASSES; pass++) {
+      code = await place(target, stored);
+      const focused = await focusedLayout();
+      if (!focused || !placementOwed(target.tab_id, focused.tab_id)) break;
+      target = focused;
+    }
   } finally {
     releasePlacementLock();
   }
