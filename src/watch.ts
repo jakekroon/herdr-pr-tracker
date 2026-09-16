@@ -43,19 +43,53 @@ export interface WatchDeps {
   now: () => number;
   /** False ends the loop. The pane process never stops; tests do. */
   running: () => boolean;
-  intervalMs?: number;
+  activeMs?: number;
+  idleMs?: number;
+  activeWindowMs?: number;
   reconcileMs?: number;
 }
 
 /**
- * How often focus is read.
+ * How often focus is read while you are moving around, and once you have
+ * stopped.
  *
- * One `herdr pane list` per tick, measured at 8.9ms p50 against a
- * fifteen-pane session — so this is about 3.6% of a core, and the widget is
- * never more than a quarter-second behind you before it starts moving. Polling
- * is the only surface Herdr leaves.
+ * The number that matters is how long the widget is missing from a tab you have
+ * just arrived in. Under 0.8 the hook path did it in 53ms, measured: Herdr
+ * dispatched the hook in the same millisecond as the focus event, and the
+ * `pane.move` landed 53ms later. A poll cannot beat that, but it can get close
+ * enough that the widget arrives with the tab rather than popping in after it —
+ * the placement itself is 60ms, so the poll interval is the whole of the
+ * difference.
+ *
+ * One `herdr pane list` costs 8.9ms p50 against a fifteen-pane session, so the
+ * active rate is about 11% of a core and the idle rate about 1.5%. Paying the
+ * active rate all the time would be wasteful for a widget that mostly watches
+ * someone type, and paying the idle rate all the time puts the widget half a
+ * second behind every switch. Switching comes in bursts, so the rate follows
+ * the bursts.
  */
-export const DEFAULT_INTERVAL_MS = 250;
+export const DEFAULT_ACTIVE_MS = 80;
+export const DEFAULT_IDLE_MS = 600;
+
+/** How long after a change the fast rate is kept. Long enough to cover a pause
+ * in the middle of a burst of switches, short enough that walking away from the
+ * keyboard costs the idle rate. */
+export const DEFAULT_ACTIVE_WINDOW_MS = 8_000;
+
+/**
+ * The gap before the next reading, given how long ago focus last moved.
+ *
+ * Pure, and exported, because the pacing is the whole user-visible quality of
+ * this thing and it should be assertable without running a loop.
+ */
+export function pollInterval(
+  msSinceChange: number,
+  activeMs = DEFAULT_ACTIVE_MS,
+  idleMs = DEFAULT_IDLE_MS,
+  activeWindowMs = DEFAULT_ACTIVE_WINDOW_MS,
+): number {
+  return msSinceChange < activeWindowMs ? activeMs : idleMs;
+}
 
 /**
  * How long the widget may sit somewhere wrong before being put right anyway.
@@ -85,13 +119,18 @@ export const DEFAULT_RECONCILE_MS = 5_000;
  * widget with the user, and one failed placement must not be the end of it.
  */
 export async function watchFocus(deps: WatchDeps): Promise<void> {
-  const interval = deps.intervalMs ?? DEFAULT_INTERVAL_MS;
+  const activeMs = deps.activeMs ?? DEFAULT_ACTIVE_MS;
+  const idleMs = deps.idleMs ?? DEFAULT_IDLE_MS;
+  const activeWindowMs = deps.activeWindowMs ?? DEFAULT_ACTIVE_WINDOW_MS;
   const reconcile = deps.reconcileMs ?? DEFAULT_RECONCILE_MS;
 
   let seeded = false;
   let lastTab: string | null = null;
   let lastPane: string | null = null;
   let lastAct = deps.now();
+  // Starts hot: the pane has just opened, which usually means you are in the
+  // middle of doing something to it.
+  let lastChange = deps.now();
 
   while (deps.running()) {
     const seen = await deps.sample();
@@ -106,23 +145,37 @@ export async function watchFocus(deps: WatchDeps): Promise<void> {
         lastPane = seen.paneId;
         lastAct = deps.now();
       } else {
+        // One flag for both, and not an assignment in each branch: you cannot
+        // change tab in Herdr without changing focused pane, so a per-branch
+        // update would have a copy that no realistic reading can reach on its
+        // own — untestable by construction, and therefore free to rot.
+        let changed = false;
+
         if (seen.tabId && seen.tabId !== lastTab) {
           lastTab = seen.tabId;
           lastAct = deps.now();
+          changed = true;
           await run(() => deps.onTabChanged(seen.tabId as string));
         } else if (lastTab && deps.now() - lastAct >= reconcile) {
+          // Housekeeping, not you doing something, so it deliberately does not
+          // hold the fast rate open.
           lastAct = deps.now();
           await run(() => deps.onTabChanged(lastTab as string));
         }
 
         if (seen.paneId && seen.paneId !== lastPane) {
           lastPane = seen.paneId;
+          changed = true;
           await run(() => deps.onPaneChanged(seen.paneId as string));
         }
+
+        if (changed) lastChange = deps.now();
       }
     }
 
-    await deps.sleep(interval);
+    await deps.sleep(
+      pollInterval(deps.now() - lastChange, activeMs, idleMs, activeWindowMs),
+    );
   }
 }
 
