@@ -1,26 +1,37 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DEFAULT_INTERVAL_MS,
+  DEFAULT_ACTIVE_MS,
+  DEFAULT_ACTIVE_WINDOW_MS,
+  DEFAULT_IDLE_MS,
   DEFAULT_RECONCILE_MS,
   type FocusSample,
+  pollInterval,
   watchFocus,
 } from "../src/watch.ts";
 
 /**
  * Drive `watchFocus` over a scripted sequence of readings.
  *
- * The clock advances by `tickMs` per reading, so a script's length is also how
- * much time passed — which is what the reconcile behaviour is expressed in.
- * `sleep` resolves immediately: the loop's ordering is under test, not its
- * pacing.
+ * With `tickMs`, the clock advances by that much per reading, so a script's
+ * length is also how much time passed — which is how the reconcile tests
+ * express themselves. Without it the clock advances by whatever gap the loop
+ * asked for, and `naps` records those gaps, which is how the pacing tests read
+ * them. No test waits in real time.
  */
 async function drive(
   script: (FocusSample | null)[],
-  opts: { tickMs?: number; reconcileMs?: number; onTab?: (t: string) => Promise<void> } = {},
+  opts: {
+    tickMs?: number;
+    reconcileMs?: number;
+    activeMs?: number;
+    idleMs?: number;
+    activeWindowMs?: number;
+    onTab?: (t: string) => Promise<void>;
+  } = {},
 ) {
-  const tickMs = opts.tickMs ?? DEFAULT_INTERVAL_MS;
   const tabs: string[] = [];
   const panes: string[] = [];
+  const naps: number[] = [];
   let clock = 0;
   let i = 0;
   await watchFocus({
@@ -32,14 +43,21 @@ async function drive(
     onPaneChanged: async (p) => {
       panes.push(p);
     },
-    sleep: async () => {
-      clock += tickMs;
+    // A fixed `tickMs` pins the clock so the reconcile tests can express
+    // themselves in time; otherwise the loop's own adaptive gap advances it,
+    // which is what the pacing tests are reading.
+    sleep: async (ms) => {
+      naps.push(ms);
+      clock += opts.tickMs ?? ms;
     },
     now: () => clock,
     running: () => i < script.length,
+    activeMs: opts.activeMs,
+    idleMs: opts.idleMs,
+    activeWindowMs: opts.activeWindowMs,
     reconcileMs: opts.reconcileMs,
   });
-  return { tabs, panes };
+  return { tabs, panes, naps };
 }
 
 const at = (tab: string, pane: string): FocusSample => ({ tabId: tab, paneId: pane });
@@ -62,7 +80,7 @@ describe("watchFocus", () => {
   });
 
   test("acts once per tab, not once per reading", async () => {
-    // The poll is four times a second and the user is not. Re-placing a widget
+    // The poll runs many times a second and you do not. Re-placing a widget
     // that is already where it belongs is a move on screen, not a no-op.
     const { tabs } = await drive([
       at("wA:t1", "wA:p1"),
@@ -209,11 +227,47 @@ describe("watchFocus", () => {
     expect(peak).toBe(1);
   });
 
-  test("polls often enough to keep up with a person, and reconciles rarely", async () => {
-    // The interval is the widget's worst-case lag before it starts moving; the
-    // reconcile is how long a misplacement can survive. Both are load-bearing
-    // numbers rather than taste.
-    expect(DEFAULT_INTERVAL_MS).toBeLessThanOrEqual(250);
-    expect(DEFAULT_RECONCILE_MS).toBeGreaterThanOrEqual(DEFAULT_INTERVAL_MS * 10);
+  test("keeps the widget's worst-case lag under what a hook used to cost", async () => {
+    // Herdr 0.8 dispatched the focus hook in the same millisecond as the event
+    // and the move landed 53ms later, measured. A poll adds its interval to the
+    // 60ms placement, so the active rate is the entire regression: at 80ms the
+    // widget is late by at most 140ms rather than 53ms, which is the difference
+    // between arriving with the tab and popping in after it.
+    expect(DEFAULT_ACTIVE_MS).toBeLessThanOrEqual(100);
+    expect(DEFAULT_IDLE_MS).toBeGreaterThanOrEqual(DEFAULT_ACTIVE_MS * 4);
+    expect(DEFAULT_RECONCILE_MS).toBeGreaterThanOrEqual(DEFAULT_IDLE_MS * 4);
+    expect(DEFAULT_ACTIVE_WINDOW_MS).toBeGreaterThan(DEFAULT_RECONCILE_MS);
+  });
+
+  test("backs off once focus has stopped moving, and speeds up again", () => {
+    expect(pollInterval(0)).toBe(DEFAULT_ACTIVE_MS);
+    expect(pollInterval(DEFAULT_ACTIVE_WINDOW_MS - 1)).toBe(DEFAULT_ACTIVE_MS);
+    expect(pollInterval(DEFAULT_ACTIVE_WINDOW_MS)).toBe(DEFAULT_IDLE_MS);
+    expect(pollInterval(DEFAULT_ACTIVE_WINDOW_MS * 100)).toBe(DEFAULT_IDLE_MS);
+  });
+
+  test("a quiet session polls at the idle rate", async () => {
+    // Nothing has ever changed, so every gap after the seed is the slow one.
+    const { naps } = await drive(
+      Array(4).fill(at("wA:t1", "wA:p1")),
+      { tickMs: 4000, activeMs: 50, idleMs: 700, activeWindowMs: 1000 },
+    );
+    expect(naps[0]).toBe(50);
+    expect(naps.slice(1)).toEqual([700, 700, 700]);
+  });
+
+  test("a switch puts the poll back on the fast rate", async () => {
+    // Two slow gaps, then focus moves: the gap after it must be the fast one,
+    // or the next switch in the burst is found half a second late.
+    const { naps } = await drive(
+      [
+        at("wA:t1", "wA:p1"),
+        at("wA:t1", "wA:p1"),
+        at("wA:t1", "wA:p1"),
+        at("wB:t1", "wB:p1"),
+      ],
+      { tickMs: 4000, activeMs: 50, idleMs: 700, activeWindowMs: 1000, reconcileMs: 999_999 },
+    );
+    expect(naps).toEqual([50, 700, 700, 50]);
   });
 });
