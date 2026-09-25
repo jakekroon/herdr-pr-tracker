@@ -39,6 +39,7 @@ import {
   movePane,
   openPluginPane,
   resizePane,
+  resyncPane,
   setPaneTitle,
 } from "../src/herdr.ts";
 import {
@@ -224,6 +225,10 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
         // final width and this finds nothing to do; it earns its keep when the
         // target was too narrow to give up the columns.
         await settleWidth(placed, desired);
+        // Herdr sized this tab's ptys before the widget arrived, so the pane
+        // beside it still has its widget-less pty. The walk above resizes only
+        // a width that is off, and the complement ratio rarely leaves one.
+        await resyncPane(placed);
         return 0;
       }
     }
@@ -240,6 +245,7 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
   if (!opened) return 1;
   await writePaneId(opened);
   await settleWidth(opened, desired);
+  await resyncPane(opened);
   return 0;
 }
 

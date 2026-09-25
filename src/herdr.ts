@@ -192,6 +192,20 @@ export async function resizePane(
 }
 
 /**
+ * Make Herdr apply the current layout to the ptys in a pane's tab.
+ *
+ * Herdr sizes a tab's ptys when it shows the tab. The widget arrives later, so
+ * the pane beside it keeps its widget-less size until the next resize. Probed on
+ * 0.9.1: an agent pane's pty stayed at 56x179 inside a 54x109 rect, and Herdr
+ * showed only the top-left of what the agent drew. A zero-amount resize replies
+ * `changed: false` and moves no split, yet it resynced the pty on 4 of 4
+ * trials. The width machinery sees no change.
+ */
+export async function resyncPane(paneId: string): Promise<void> {
+  await resizePane(paneId, "left", 0);
+}
+
+/**
  * Converge on having a widget on screen.
  *
  * `follow` is the single place that knows where the widget belongs and is
