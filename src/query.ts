@@ -189,6 +189,33 @@ export function withIgnores(q: string, entries: readonly IgnoreEntry[]): string 
   );
 }
 
+// --- idle cutoff -------------------------------------------------------------
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The oldest update date a pull request may carry and still be fetched, as the
+ * `YYYY-MM-DD` GitHub's `updated:>=` qualifier takes, or `null` for no cutoff.
+ *
+ * `now` is a parameter so the date is a pure function of its inputs; the one
+ * caller that reads the clock is `gh.ts`. UTC so the date does not depend on
+ * the machine's time zone. The boundary is only good to the day, which suits a
+ * setting counted in days.
+ */
+export function idleSince(maxIdleDays: number | null, now: Date): string | null {
+  if (maxIdleDays == null) return null;
+  return new Date(now.getTime() - maxIdleDays * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * A search with the idle cutoff applied. Subtracted at the search for the
+ * reasons the ignore list is, and appended to every search for the same one:
+ * it can only shorten a list. See docs/adr/0006-idle-cutoff.md.
+ */
+export function withIdleCutoff(q: string, since: string | null): string {
+  return since == null ? q : `${q} updated:>=${since}`;
+}
+
 // --- request arguments -------------------------------------------------------
 //
 // The `gh api graphql` argument lists live here rather than inline in `gh.ts`
@@ -203,13 +230,14 @@ export function searchArgs(
   query: string,
   maxPrs: number,
   ignore: readonly IgnoreEntry[],
+  since: string | null,
   threads: number,
 ): string[] {
   return [
     "-f",
     `query=${SEARCH_QUERY}`,
     "-F",
-    `q=${withIgnores(query, ignore)}`,
+    `q=${withIdleCutoff(withIgnores(query, ignore), since)}`,
     "-F",
     `prs=${maxPrs}`,
     "-F",
@@ -226,6 +254,7 @@ export function searchArgs(
  */
 export function inboundArgs(
   ignore: readonly IgnoreEntry[],
+  since: string | null,
   threads: number,
 ): string[] {
   return [
@@ -233,7 +262,7 @@ export function inboundArgs(
     `query=${INBOUND_QUERY}`,
     ...INBOUND_SEARCHES.flatMap((
       s,
-    ) => ["-F", `${s.alias}=${withIgnores(s.q, ignore)}`]),
+    ) => ["-F", `${s.alias}=${withIdleCutoff(withIgnores(s.q, ignore), since)}`]),
     "-F",
     `prs=${SEARCH_PAGE}`,
     "-F",

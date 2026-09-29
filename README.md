@@ -396,6 +396,19 @@ any row that stays means. Both views are subtracted at the search, so the pane
 never learns what it left out: there is no "N ignored" count, and `0 open` with
 `✓ all clear` is a statement about what you track rather than about GitHub.
 
+`MAX_IDLE_DAYS` hides pull requests with no update in that many days, in
+**either** view:
+
+```
+MAX_IDLE_DAYS=30
+```
+
+"Update" is GitHub's `updated` date: a comment, a push, a review or a label
+keeps a pull request in, however old it is, and so do bots and a CI run
+finishing. The age on a row is still time since it was opened. Like
+`IGNORE_REPOS` it is subtracted at the search, so there is no "N hidden" count.
+Unset or `0` means no cutoff.
+
 Signal precedence, sort order and what any mark *means* are deliberately **not**
 configurable. A widget whose meaning depends on settings is a widget you have to
 remember the settings of before you can read it. `GLYPHS` and `COLOR` are not

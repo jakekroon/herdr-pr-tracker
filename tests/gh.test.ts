@@ -32,6 +32,26 @@ describe("classify", () => {
   });
 });
 
+// Three of the variables in a request are not searches: the GraphQL document
+// itself, the page size and the thread cap. Everything else is a query going
+// to GitHub. Listing the exceptions rather than the searches is the point — a
+// fourth search under any name is a search until this set says otherwise.
+const NOT_A_SEARCH = new Set(["query", "prs", "threads"]);
+
+/** The `name=value` pairs in a `gh api graphql` argument list, split into the
+ * searches and the rest. */
+const variables = (args: string[]) => {
+  const all: Array<{ name: string; value: string }> = [];
+  for (let i = 0; i < args.length; i += 2) {
+    expect(["-f", "-F"]).toContain(args[i]!);
+    const pair = args[i + 1]!;
+    const eq = pair.indexOf("=");
+    expect(eq).toBeGreaterThan(0);
+    all.push({ name: pair.slice(0, eq), value: pair.slice(eq + 1) });
+  }
+  return { all, searches: all.filter((v) => !NOT_A_SEARCH.has(v.name)) };
+};
+
 // "A view cannot forget the ignore list" is an invariant the comments in gh.ts
 // *state*, and a stated invariant with no test is one that breaks the next time
 // a view is added. gh.ts spawns, so it is unreachable from a test — which is why
@@ -45,29 +65,9 @@ describe("the ignore list reaches every search", () => {
   ];
   const SUBTRACTED = ["-repo:acme/web-app", "-user:initech"];
 
-  // Three of the variables in a request are not searches: the GraphQL document
-  // itself, the page size and the thread cap. Everything else is a query going
-  // to GitHub. Listing the exceptions rather than the searches is the point — a
-  // fourth search under any name is a search until this set says otherwise.
-  const NOT_A_SEARCH = new Set(["query", "prs", "threads"]);
-
-  /** The `name=value` pairs in a `gh api graphql` argument list, split into the
-   * searches and the rest. */
-  const variables = (args: string[]) => {
-    const all: Array<{ name: string; value: string }> = [];
-    for (let i = 0; i < args.length; i += 2) {
-      expect(["-f", "-F"]).toContain(args[i]!);
-      const pair = args[i + 1]!;
-      const eq = pair.indexOf("=");
-      expect(eq).toBeGreaterThan(0);
-      all.push({ name: pair.slice(0, eq), value: pair.slice(eq + 1) });
-    }
-    return { all, searches: all.filter((v) => !NOT_A_SEARCH.has(v.name)) };
-  };
-
   const REQUESTS: Array<[string, string[], number]> = [
-    ["authored", searchArgs("is:pr is:open author:@me", 100, IGNORED, 100), 1],
-    ["inbound", inboundArgs(IGNORED, 100), 3],
+    ["authored", searchArgs("is:pr is:open author:@me", 100, IGNORED, null, 100), 1],
+    ["inbound", inboundArgs(IGNORED, null, 100), 3],
   ];
 
   test.each(REQUESTS)("the %s request names the non-searches it exempts", (_n, args) => {
@@ -88,7 +88,7 @@ describe("the ignore list reaches every search", () => {
   });
 
   test("an empty ignore list subtracts nothing", () => {
-    for (const args of [searchArgs("is:pr is:open author:@me", 100, [], 100), inboundArgs([], 100)]) {
+    for (const args of [searchArgs("is:pr is:open author:@me", 100, [], null, 100), inboundArgs([], null, 100)]) {
       for (const s of variables(args).searches) {
         expect(s.value).not.toContain("-repo:");
         expect(s.value).not.toContain("-user:");
@@ -100,4 +100,24 @@ describe("the ignore list reaches every search", () => {
   // here: `ignore` is a required parameter, so tsc refuses it, which is both
   // stronger than anything written here and the enforcement this repo already
   // leans on elsewhere.
+});
+
+describe("the idle cutoff reaches every search", () => {
+  const REQUESTS: Array<[string, string[], number]> = [
+    ["authored", searchArgs("is:pr is:open author:@me", 100, [], "2026-08-30", 100), 1],
+    ["custom authored", searchArgs("is:pr review-requested:@me", 100, [], "2026-08-30", 100), 1],
+    ["inbound", inboundArgs([], "2026-08-30", 100), 3],
+  ];
+
+  test.each(REQUESTS)("every %s search is sent with the cutoff", (_n, args, count) => {
+    const { searches } = variables(args);
+    expect(searches.length).toBe(count);
+    for (const s of searches) expect(s.value).toEndWith(" updated:>=2026-08-30");
+  });
+
+  test("no cutoff adds no date qualifier", () => {
+    for (const args of [searchArgs("is:pr is:open author:@me", 100, [], null, 100), inboundArgs([], null, 100)]) {
+      for (const s of variables(args).searches) expect(s.value).not.toContain("updated:");
+    }
+  });
 });
