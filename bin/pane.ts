@@ -271,8 +271,8 @@ async function refresh(target: View) {
     // The inbound view is deliberately not `fetchPrs` with a different query:
     // it is three searches and a dedup, and its rows carry a reason.
     const list = target === "inbound"
-      ? await fetchInbound(cfg.maxPrs, cfg.ignore)
-      : await fetchPrs(cfg.searchQuery, cfg.maxPrs, cfg.ignore);
+      ? await fetchInbound(cfg.maxPrs, cfg.ignore, cfg.maxIdleDays)
+      : await fetchPrs(cfg.searchQuery, cfg.maxPrs, cfg.ignore, cfg.maxIdleDays);
     // Workspace linkage is local and cheap, and a failure to read it must not
     // discard a good PR fetch — so it degrades to "nothing linked".
     let linked = list.rows;

@@ -95,6 +95,25 @@
 # loud, and not something you could mistake for a filter that is working.
 #IGNORE_REPOS=""
 
+# Hide pull requests with no update in this many days, in either view. Unset,
+# 0, or a value that does not start with a positive number leaves every pull
+# request in.
+#
+#   MAX_IDLE_DAYS=30
+#
+# "Update" is GitHub's `updated` date, so a comment, a push, a review or a
+# label keeps a pull request in, however long ago it was opened. So does
+# activity you did not cause: a bot comment, a Dependabot rebase, a CI run
+# finishing. The age on each row is still the time since the pull request was
+# opened, so a row can read `200d` and still pass the cutoff.
+#
+# Like IGNORE_REPOS it is subtracted at the search, so hidden pull requests
+# cost no page budget and the pane never counts them. `✓ all clear` then means
+# nothing active needs you, and idle pull requests may still be open. It
+# reaches a custom SEARCH_QUERY too. The boundary is a UTC date, so it is only
+# good to the day.
+#MAX_IDLE_DAYS=
+
 # Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
 # beyond this are counted in the "+N older" row rather than silently dropped.
 #MAX_PRS=100

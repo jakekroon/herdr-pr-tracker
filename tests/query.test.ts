@@ -6,6 +6,7 @@ import {
   INBOUND_SEARCHES,
   SEARCH_PAGE,
   SEARCH_QUERY,
+  idleSince,
   withIgnores,
 } from "../src/query.ts";
 
@@ -155,5 +156,24 @@ describe("withIgnores", () => {
     for (const s of INBOUND_SEARCHES) {
       expect(withIgnores(s.q, [...entries])).toContain("-repo:acme/web-app");
     }
+  });
+});
+
+describe("idleSince", () => {
+  test("no cutoff configured is no cutoff date", () => {
+    expect(idleSince(null, new Date("2026-09-29T12:00:00Z"))).toBeNull();
+  });
+
+  test("is the date N days before now", () => {
+    expect(idleSince(30, new Date("2026-09-29T12:00:00Z"))).toBe("2026-08-30");
+  });
+
+  test("is taken in UTC, whatever the local date is", () => {
+    // 23:30 on the 29th in UTC-7 is already the 30th in UTC.
+    expect(idleSince(1, new Date("2026-09-29T23:30:00-07:00"))).toBe("2026-09-29");
+  });
+
+  test("rolls back across a year boundary", () => {
+    expect(idleSince(10, new Date("2027-01-05T00:00:00Z"))).toBe("2026-12-26");
   });
 });

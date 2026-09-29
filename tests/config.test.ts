@@ -53,6 +53,16 @@ describe("parseConfig", () => {
     expect(parseConfig("MAX_PRS=-4").maxPrs).toBeUndefined();
   });
 
+  test("MAX_IDLE_DAYS is read as a whole number of days", () => {
+    expect(parseConfig("MAX_IDLE_DAYS=30").maxIdleDays).toBe(30);
+  });
+
+  test("a MAX_IDLE_DAYS that is not a positive number leaves the cutoff off", () => {
+    for (const v of ["0", "-7", "soon", ""]) {
+      expect(parseConfig(`MAX_IDLE_DAYS=${v}`).maxIdleDays).toBeUndefined();
+    }
+  });
+
   test("an unknown SHOW_OWNER value is ignored", () => {
     expect(parseConfig("SHOW_OWNER=sometimes").showOwner).toBeUndefined();
   });
@@ -77,6 +87,7 @@ describe("parseConfig", () => {
     expect(DEFAULTS.colour).toBe(true);
     expect(DEFAULTS.ignore).toEqual([]);
     expect(DEFAULTS.ignoreDropped).toEqual([]);
+    expect(DEFAULTS.maxIdleDays).toBeNull();
   });
 });
 

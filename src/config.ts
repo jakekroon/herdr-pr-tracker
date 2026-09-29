@@ -34,6 +34,9 @@ export interface Config {
    * than warned about here so the pure layer stays pure and only the pane —
    * not the sidebar token, which shares this loader — does the complaining. */
   ignoreDropped: string[];
+  /** Pull requests with no update in this many days are never fetched, in
+   * either view. `null` is no cutoff. */
+  maxIdleDays: number | null;
 }
 
 export const DEFAULTS: Config = {
@@ -46,6 +49,7 @@ export const DEFAULTS: Config = {
   tokenThrottleSeconds: 30,
   ignore: [],
   ignoreDropped: [],
+  maxIdleDays: null,
 };
 
 // A GitHub login: alphanumerics and hyphens, never starting or ending with a
@@ -176,6 +180,8 @@ export function parseConfig(text: string): Partial<Config> {
   if (max != null) cfg.maxPrs = Math.min(max, 100);
   const throttle = int(out.TOKEN_THROTTLE_SECONDS, 0);
   if (throttle != null) cfg.tokenThrottleSeconds = throttle;
+  const idle = int(out.MAX_IDLE_DAYS, 1);
+  if (idle != null) cfg.maxIdleDays = idle;
   if (out.SEARCH_QUERY) cfg.searchQuery = out.SEARCH_QUERY;
   if (out.SHOW_OWNER === "always" || out.SHOW_OWNER === "never" || out.SHOW_OWNER === "auto") {
     cfg.showOwner = out.SHOW_OWNER;

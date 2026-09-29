@@ -3,6 +3,7 @@
 
 import { parseInbound, parseSearch, type PrList } from "./model.ts";
 import {
+  idleSince,
   type IgnoreEntry,
   inboundArgs,
   inboundComplete,
@@ -108,16 +109,19 @@ async function graphql(
  * view could be added that forgot to, and the symptom would be a setting that
  * works in one view and not the other. It has no default for the same reason — a
  * required parameter makes tsc the enforcer, which is where this repo puts
- * invariants it does not want to rely on a reader noticing.
+ * invariants it does not want to rely on a reader noticing. `maxIdleDays` is
+ * required for the same reason, and turned into a date here so that `query.ts`
+ * never reads the clock.
  */
 export async function fetchPrs(
   query: string,
   maxPrs: number,
   ignore: readonly IgnoreEntry[],
+  maxIdleDays: number | null,
   threads = 100,
 ): Promise<PrList> {
   const payload = await graphql(
-    searchArgs(query, maxPrs, ignore, threads),
+    searchArgs(query, maxPrs, ignore, idleSince(maxIdleDays, new Date()), threads),
     (data) => Boolean(data.search),
   );
   return parseSearch(payload, threads);
@@ -139,9 +143,13 @@ export async function fetchPrs(
 export async function fetchInbound(
   maxPrs: number,
   ignore: readonly IgnoreEntry[],
+  maxIdleDays: number | null,
   threads = 100,
 ): Promise<PrList> {
-  const payload = await graphql(inboundArgs(ignore, threads), inboundComplete);
+  const payload = await graphql(
+    inboundArgs(ignore, idleSince(maxIdleDays, new Date()), threads),
+    inboundComplete,
+  );
   return parseInbound(payload, threads, maxPrs);
 }
 
