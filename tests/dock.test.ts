@@ -9,6 +9,7 @@ import {
   moveRatio,
   ratioChanged,
   shouldRecordWidth,
+  stackPartner,
   usableRatio,
   widthStep,
   type WidgetPane,
@@ -327,5 +328,31 @@ describe("lockIsStale as the in-flight test", () => {
 
   test("a lock older than the lease does not hold recording back forever", () => {
     expect(lockIsStale(1_000_000, 1_000_000 + 20_000)).toBe(true);
+  });
+});
+
+describe("stackPartner", () => {
+  test("no partner when the widget has its column to itself", () => {
+    expect(stackPartner([pane("a", 0, 0, 143, 56), pane("w", 143, 0, 36, 56)], "w")).toBeNull();
+  });
+
+  test("a pane split off below the widget, keeping its share of the column", () => {
+    const panes = [pane("a", 0, 0, 143, 56), pane("w", 143, 0, 36, 20), pane("s", 143, 20, 36, 36)];
+    expect(stackPartner(panes, "w")).toEqual({ pane: "s", keep: 36 / 56 });
+  });
+
+  test("prefers the pane above, the order a split down can restore", () => {
+    const panes = [pane("up", 143, 0, 36, 18), pane("w", 143, 18, 36, 20), pane("down", 143, 38, 36, 18)];
+    expect(stackPartner(panes, "w")?.pane).toBe("up");
+  });
+
+  test("a pane split top and bottom beside the widget is not in its column", () => {
+    const panes = [pane("a", 0, 0, 143, 28), pane("b", 0, 28, 143, 28), pane("w", 143, 0, 36, 56)];
+    expect(stackPartner(panes, "w")).toBeNull();
+  });
+
+  test("a narrower pane under the widget does not share its column", () => {
+    const panes = [pane("w", 143, 0, 36, 28), pane("s", 143, 28, 18, 28), pane("t", 161, 28, 18, 28)];
+    expect(stackPartner(panes, "w")).toBeNull();
   });
 });

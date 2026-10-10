@@ -26,6 +26,33 @@ export interface Layout {
 const rightEdge = (p: LayoutPane) => p.rect.x + p.rect.width;
 
 /**
+ * The pane the widget shares its column with, when the user has split the
+ * widget's pane top and bottom, and the share of the column that pane keeps.
+ *
+ * Read just before the widget leaves a tab. Once it has left, the partner fills
+ * the whole column and `dockTarget` sees an ordinary full-height pane, so the
+ * widget came back *beside* it and squeezed it to a sliver. Recording the
+ * partner lets the widget go back under it instead. `pane move` can only split
+ * `right` or `down`, so a partner above is preferred: it is the one order the
+ * move can restore. A partner below still comes back stacked, but on top.
+ */
+export function stackPartner(
+  panes: LayoutPane[],
+  widgetId: string,
+): { pane: string; keep: number } | null {
+  const w = panes.find((p) => p.pane_id === widgetId);
+  if (!w) return null;
+  const column = panes.filter(
+    (p) => p.pane_id !== widgetId && p.rect.x === w.rect.x && p.rect.width === w.rect.width,
+  );
+  const partner =
+    column.find((p) => p.rect.y + p.rect.height === w.rect.y) ??
+    column.find((p) => p.rect.y === w.rect.y + w.rect.height);
+  if (!partner) return null;
+  return { pane: partner.pane_id, keep: partner.rect.height / (partner.rect.height + w.rect.height) };
+}
+
+/**
  * How short a pane may be, against the tallest in the tab, and still be worth
  * splitting. A pane below this is a strip along an edge, not a column.
  */

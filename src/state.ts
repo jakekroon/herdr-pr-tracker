@@ -114,10 +114,15 @@ export async function clearPaneId(): Promise<void> {
  * can stop short, and without this the next settled run would measure the
  * shortfall and record it as though the user had chosen it. See
  * `shouldRecordWidth`.
+ *
+ * `stack` is the pane the widget shared its column with when it last left the
+ * tab, if the user had split the widget's pane top and bottom. See
+ * `stackPartner`.
  */
 export interface TabWidth {
   width: number | null;
   placed: number | null;
+  stack: { pane: string; keep: number } | null;
 }
 
 const widthsPath = () => join(stateDir(), "widths.json");
@@ -136,7 +141,15 @@ const finite = (n: unknown): number | null =>
 
 export function readTabWidth(tabId: string | undefined): TabWidth {
   const entry = tabId == null ? undefined : readWidths()[tabId];
-  return { width: finite(entry?.width), placed: finite(entry?.placed) };
+  const stack = entry?.stack;
+  return {
+    width: finite(entry?.width),
+    placed: finite(entry?.placed),
+    stack:
+      typeof stack?.pane === "string" && finite(stack?.keep) != null
+        ? { pane: stack.pane, keep: stack.keep }
+        : null,
+  };
 }
 
 function updateTabWidth(tabId: string | undefined, change: (entry: Partial<TabWidth>) => void): void {
@@ -162,6 +175,13 @@ export function recordTabWidth(tabId: string | undefined, ratio: number): void {
   updateTabWidth(tabId, (e) => {
     e.width = ratio;
     delete e.placed;
+  });
+}
+
+export function recordStack(tabId: string | undefined, stack: TabWidth["stack"]): void {
+  updateTabWidth(tabId, (e) => {
+    if (stack == null) delete e.stack;
+    else e.stack = stack;
   });
 }
 

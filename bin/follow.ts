@@ -29,6 +29,7 @@ import {
   moveRatio,
   ratioChanged,
   shouldRecordWidth,
+  stackPartner,
   usableRatio,
   WIDGET_LABEL,
   widthStep,
@@ -49,6 +50,7 @@ import {
   readTabWidth,
   readView,
   recordPlacedWidth,
+  recordStack,
   recordTabWidth,
   releasePlacementLock,
   takePlacementLock,
@@ -168,6 +170,7 @@ async function recordWidthLeftBehind(paneId: string): Promise<void> {
   const home = await layout(paneId);
   const there = home?.panes.find((p) => p.pane_id === paneId);
   if (!home || !there || home.zoomed) return;
+  recordStack(home.tab_id, stackPartner(home.panes, paneId));
   const left = usableRatio(paneRatio(there.rect.width, home.area?.width ?? 0));
   // Same hazard as the settled path: the width standing in the old tab is a
   // drag only if it is not the width the last placement there managed to reach.
@@ -201,6 +204,25 @@ async function place(l: Layout, recorded: string | null): Promise<number> {
     // to see a drag there that no settled run ever got to observe. It is
     // recorded for that tab only; this tab keeps its own width.
     await recordWidthLeftBehind(known);
+
+    // The user split the widget's pane top and bottom when it was last here,
+    // so it goes back under that pane rather than beside it. The column's
+    // width is the partner's, so there is no width to walk.
+    const stack = readTabWidth(l.tab_id).stack;
+    if (stack && l.panes.some((p) => p.pane_id === stack.pane)) {
+      const moved = await movePane(known, {
+        tabId: l.tab_id,
+        targetPane: stack.pane,
+        split: "down",
+        ratio: stack.keep,
+      });
+      const after = moved ? await layout() : null;
+      const placed = after ? await reconcile(after.tab_id, moved) : null;
+      if (placed && after?.panes.some((p) => p.pane_id === placed)) {
+        await resyncPane(placed);
+        return 0;
+      }
+    }
 
     // Relocate rather than close-and-reopen: the renderer process survives the
     // trip, so the list stays on screen instead of blanking and refetching.

@@ -6,6 +6,7 @@ import {
   placementInFlight,
   readTabWidth,
   recordPlacedWidth,
+  recordStack,
   recordTabWidth,
   releasePlacementLock,
   takePlacementLock,
@@ -64,7 +65,7 @@ describe("tab widths", () => {
     recordTabWidth("w1:t1", 0.35);
 
     expect(readTabWidth("w1:t1").width).toBe(0.35);
-    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: null });
+    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: null, stack: null });
   });
 
   test("recording a width drops that tab's placement shortfall and no other", () => {
@@ -73,18 +74,18 @@ describe("tab widths", () => {
     recordPlacedWidth("w2:t1", 0.18);
     recordTabWidth("w1:t1", 0.3);
 
-    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null });
-    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: 0.18 });
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null, stack: null });
+    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: 0.18, stack: null });
   });
 
   test("a placement keeps the tab's chosen width", () => {
     useFreshStateDir();
     recordTabWidth("w1:t1", 0.3);
     recordPlacedWidth("w1:t1", 0.27);
-    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: 0.27 });
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: 0.27, stack: null });
 
     recordPlacedWidth("w1:t1", null);
-    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null });
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null, stack: null });
   });
 
   test("an unreadable file reads as no record rather than failing", () => {
@@ -92,8 +93,20 @@ describe("tab widths", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "widths.json"), "{trunc");
 
-    expect(readTabWidth("w1:t1")).toEqual({ width: null, placed: null });
+    expect(readTabWidth("w1:t1")).toEqual({ width: null, placed: null, stack: null });
     recordTabWidth("w1:t1", 0.3);
     expect(readTabWidth("w1:t1").width).toBe(0.3);
+  });
+
+  test("a stack partner is kept per tab and cleared when the widget leaves unstacked", () => {
+    useFreshStateDir();
+    recordTabWidth("w1:t1", 0.3);
+    recordStack("w1:t1", { pane: "w1:p5", keep: 0.6 });
+
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null, stack: { pane: "w1:p5", keep: 0.6 } });
+    expect(readTabWidth("w2:t1").stack).toBeNull();
+
+    recordStack("w1:t1", null);
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null, stack: null });
   });
 });
