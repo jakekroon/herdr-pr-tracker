@@ -1,8 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { placementInFlight, releasePlacementLock, takePlacementLock } from "../src/state.ts";
+import {
+  placementInFlight,
+  readTabWidth,
+  recordPlacedWidth,
+  recordTabWidth,
+  releasePlacementLock,
+  takePlacementLock,
+} from "../src/state.ts";
 
 // The only tests here that touch the filesystem: the placement lock is the one
 // writer that does not go through `Bun.write`, so it is the one place a missing
@@ -48,5 +55,45 @@ describe("takePlacementLock", () => {
     releasePlacementLock();
     expect(placementInFlight()).toBe(false);
     expect(await takePlacementLock()).toBe(true);
+  });
+});
+
+describe("tab widths", () => {
+  test("a width recorded in one tab leaves every other tab at no record", () => {
+    useFreshStateDir();
+    recordTabWidth("w1:t1", 0.35);
+
+    expect(readTabWidth("w1:t1").width).toBe(0.35);
+    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: null });
+  });
+
+  test("recording a width drops that tab's placement shortfall and no other", () => {
+    useFreshStateDir();
+    recordPlacedWidth("w1:t1", 0.25);
+    recordPlacedWidth("w2:t1", 0.18);
+    recordTabWidth("w1:t1", 0.3);
+
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null });
+    expect(readTabWidth("w2:t1")).toEqual({ width: null, placed: 0.18 });
+  });
+
+  test("a placement keeps the tab's chosen width", () => {
+    useFreshStateDir();
+    recordTabWidth("w1:t1", 0.3);
+    recordPlacedWidth("w1:t1", 0.27);
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: 0.27 });
+
+    recordPlacedWidth("w1:t1", null);
+    expect(readTabWidth("w1:t1")).toEqual({ width: 0.3, placed: null });
+  });
+
+  test("an unreadable file reads as no record rather than failing", () => {
+    const dir = useFreshStateDir();
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "widths.json"), "{trunc");
+
+    expect(readTabWidth("w1:t1")).toEqual({ width: null, placed: null });
+    recordTabWidth("w1:t1", 0.3);
+    expect(readTabWidth("w1:t1").width).toBe(0.3);
   });
 });
