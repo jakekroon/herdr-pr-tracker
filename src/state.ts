@@ -102,56 +102,94 @@ export async function clearPaneId(): Promise<void> {
 }
 
 /**
- * The remembered width, as a fraction of the tab.
+ * What is remembered about the widget's width in one tab, as fractions of it.
  *
- * The widget is relocated into whichever tab you enter, and a relocation has to
- * name a width — so without this, every tab change reset the width the user had
- * dragged the split to. Recording the width they last left it at makes the
- * dock ratio a preference rather than a constant.
+ * `width` is the width the user left the widget at in that tab. It is kept per
+ * tab, not once for all of them: a global width meant that a split in one tab,
+ * which narrows the widget, was recorded as a drag and then imposed on every
+ * other tab the widget visited. A tab with no record docks at the default.
+ *
+ * `placed` is the width the last placement in that tab actually reached, as
+ * opposed to the one it aimed at. `pane resize` is layout-dependent and a walk
+ * can stop short, and without this the next settled run would measure the
+ * shortfall and record it as though the user had chosen it. See
+ * `shouldRecordWidth`.
+ *
+ * `stack` is the pane the widget shared its column with when it last left the
+ * tab, if the user had split the widget's pane top and bottom. See
+ * `stackPartner`.
  */
-export async function readWidthRatio(): Promise<number | null> {
+export interface TabWidth {
+  width: number | null;
+  placed: number | null;
+  stack: { pane: string; keep: number } | null;
+}
+
+const widthsPath = () => join(stateDir(), "widths.json");
+
+function readWidths(): Record<string, Partial<TabWidth>> {
   try {
-    const n = Number.parseFloat((await Bun.file(join(stateDir(), "width_ratio")).text()).trim());
-    return Number.isFinite(n) ? n : null;
+    const raw = JSON.parse(readFileSync(widthsPath(), "utf8"));
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   } catch {
-    return null;
+    return {};
   }
 }
 
-export async function writeWidthRatio(ratio: number): Promise<void> {
-  // Best-effort: forgetting a width costs one re-dock at the default, so this
-  // must never be the thing that stops the widget from being placed.
-  await Bun.write(join(stateDir(), "width_ratio"), `${ratio}\n`).catch(() => {});
+const finite = (n: unknown): number | null =>
+  typeof n === "number" && Number.isFinite(n) ? n : null;
+
+export function readTabWidth(tabId: string | undefined): TabWidth {
+  const entry = tabId == null ? undefined : readWidths()[tabId];
+  const stack = entry?.stack;
+  return {
+    width: finite(entry?.width),
+    placed: finite(entry?.placed),
+    stack:
+      typeof stack?.pane === "string" && finite(stack?.keep) != null
+        ? { pane: stack.pane, keep: stack.keep }
+        : null,
+  };
 }
 
-/**
- * The width a placement actually reached, as opposed to the one it aimed at.
- *
- * `pane resize` is layout-dependent and a walk can stop short — a tab shared
- * with another plugin's pane cannot always give up the columns. Without a record
- * of what was reached, the next settled run measures the shortfall, finds it
- * different from the stored preference, and writes it back as though the user
- * had chosen it. See `shouldRecordWidth`.
- *
- * This is deliberately *not* the same file as `width_ratio`: one is what the
- * user asked for and must survive, the other is a fact about the last placement
- * and is expected to be overwritten constantly.
- */
-export async function readPlacedRatio(): Promise<number | null> {
+function updateTabWidth(tabId: string | undefined, change: (entry: Partial<TabWidth>) => void): void {
+  if (tabId == null) return;
+  // Best-effort: forgetting a width costs one dock at the default, so this must
+  // never be the thing that stops the widget from being placed. Written
+  // rename-style, because a truncated file would forget every tab at once.
   try {
-    const n = Number.parseFloat((await Bun.file(join(stateDir(), "placed_ratio")).text()).trim());
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
+    const all = readWidths();
+    const entry = { ...all[tabId] };
+    change(entry);
+    all[tabId] = entry;
+    const path = widthsPath();
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(`${path}.tmp`, JSON.stringify(all));
+    renameSync(`${path}.tmp`, path);
+  } catch {}
 }
 
-export async function writePlacedRatio(ratio: number): Promise<void> {
-  await Bun.write(join(stateDir(), "placed_ratio"), `${ratio}\n`).catch(() => {});
+/** The user chose this width here, so the last placement's shortfall no longer
+ * explains anything. */
+export function recordTabWidth(tabId: string | undefined, ratio: number): void {
+  updateTabWidth(tabId, (e) => {
+    e.width = ratio;
+    delete e.placed;
+  });
 }
 
-export async function clearPlacedRatio(): Promise<void> {
-  await Bun.file(join(stateDir(), "placed_ratio")).delete().catch(() => {});
+export function recordStack(tabId: string | undefined, stack: TabWidth["stack"]): void {
+  updateTabWidth(tabId, (e) => {
+    if (stack == null) delete e.stack;
+    else e.stack = stack;
+  });
+}
+
+export function recordPlacedWidth(tabId: string | undefined, ratio: number | null): void {
+  updateTabWidth(tabId, (e) => {
+    if (ratio == null) delete e.placed;
+    else e.placed = ratio;
+  });
 }
 
 /**

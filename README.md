@@ -1,15 +1,14 @@
 # herdr-pr-tracker
 
-A [Herdr](https://herdr.dev) plugin that keeps a list of **every open pull
-request you have authored**, across every repository you can see, docked on the
-right of whatever tab you are looking at.
+A [Herdr](https://herdr.dev) plugin. It shows **all open pull requests that you
+wrote**, from all repositories you can see. The list docks on the right of the
+current tab.
 
-It answers one question: *what is the state of everything I have open?* — and it
-only tracks. It never opens, closes, merges or comments on anything.
+The plugin only tracks. It does not open, close, merge or comment on a pull
+request.
 
-It has a second view, for the other half of the same problem: the pull requests
-**waiting on you** as a reviewer. One pane, one view at a time — see
-[Two views](#two-views).
+A second view shows the pull requests that **wait for your review**. The widget
+shows one view at a time. See [Two views](#two-views).
 
 ```
    5 open · 2 need you · toggle · 12s ago
@@ -31,160 +30,142 @@ metrics-service ─────────────────────�
     #412 Move the nightly import behind … 1h
 ```
 
-One summary line, then a band per repository, then one pull request per pair of
-lines: the branch and its status first, the number, title and the pull request's
-own age second. **The title is a hyperlink** — click it and the pull request
-opens in your browser.
+The first line is a summary. Each repository has a heading. Each pull request
+has two lines:
 
-## What each mark means
+1. The branch and its status marks.
+2. The number, the title and the age of the pull request.
+
+**The title is a link.** Click it to open the pull request in your browser.
+
+## Marks
 
 | Mark | Meaning | Colour |
 |---|---|---|
-| `⊘` | Cannot be merged without resolving a conflict | red |
-| `✗` in the review column | Changes requested | red |
-| `✗` in the check column | Checks failing | red |
-| `⚑N` | `N` unresolved review threads | yellow |
-| `◆` | A review is required and has not been given | magenta |
-| `●` | Checks still running | blue |
+| `⊘` | A conflict stops the merge | red |
+| `✗` in the review column | The reviewer requests changes | red |
+| `✗` in the check column | Checks fail | red |
+| `⚑N` | `N` review threads are open | yellow |
+| `◆` | A required review is not done | magenta |
+| `●` | Checks are in progress | blue |
 | `✓` in the review column | Approved | green |
-| `✓` in the check column | Checks passing | green |
-| `◌` | Draft — dims the whole row | dim |
-| **bold** branch | *My PRs only* — a conflict, changes requested, failing checks or unresolved threads: the four that are yours to act on | — |
-| `▪` | A Herdr workspace is open on this branch | dim |
-| `◦` | *Awaiting Review only* — you are in the conversation but nobody asked you | plain |
-| `N` at the end of a repository rule | *My PRs only* — how many of that repository's pull requests need you | the loudest of them |
-| *nothing* | Ready for review, nothing to do | plain |
-| `⚠` under the last band | Not a pull request at all — a `config` problem, see [Configuration](#configuration) | yellow |
+| `✓` in the check column | Checks pass | green |
+| `◌` | Draft. The row is dim | dim |
+| **bold** branch | `My PRs` only. A conflict, requested changes, failed checks or open threads. You must act on these four | none |
+| `▪` | A Herdr workspace has this branch open | dim |
+| `◦` | `Awaiting Review` only. You are in the conversation, but nobody asked for your review | plain |
+| `N` after a repository heading | `My PRs` only. The number of pull requests in that repository that need you | the loudest colour of those rows |
+| no mark | Ready for review. No action | plain |
+| `⚠` below the list | A `config` error. See [Configuration](#configuration) | yellow |
 
-A pull request can carry several of these at once, so each is drawn separately —
-nothing is hidden by something louder. The row's own colour is the loudest one it
-carries, in this order: conflict, changes requested, failing checks, unresolved
-threads, review required, checks running, approved, clean.
+One pull request can show many marks. Each mark has its own cell, so a loud mark
+does not hide a quiet mark.
 
-### Marks in a Nerd Font
+The row colour is the colour of its loudest mark. The order is: conflict,
+changes requested, failed checks, open threads, review required, checks in
+progress, approved, clean.
 
-The marks above are geometric shapes and dingbats, and **most monospace fonts do
-not have them**. Of the eleven, Monaco — macOS's default — has exactly one
-(`◆`); the other ten are drawn by OS font fallback out of whichever proportional
-font happens to have them. That is why they can look like they came from
-different typefaces. They did.
+### Nerd Font marks
 
-`GLYPHS=nerd` draws [Octicons](https://primer.style/octicons/), GitHub's own icon
-set, instead. Same cells, same widths, same meanings — a typeface, not a
-vocabulary — plus one thing the default set cannot say: a review verdict and a
-build result get separate marks, where the default spends `✓` on both a passing
-build and an approval.
+Most monospace fonts do not have these marks. Monaco, the macOS default, has
+one of the eleven (`◆`). The OS draws the other ten from different fonts, so the
+marks can look different.
 
-Set it in `config` — either the copy beside the plugin (`cp config.example
-config`) or the one in `herdr plugin config-dir herdr-pr-tracker`, which is read
-second and wins:
+`GLYPHS=nerd` uses [Octicons](https://primer.style/octicons/), the GitHub icon
+set. The cells, widths and meanings do not change. The review result and the
+check result also get different marks. The default set uses `✓` for both.
+
+Add this line to `config`:
 
 ```
 GLYPHS=nerd
 ```
 
-Swap back with `GLYPHS=unicode`, or by deleting the line. Write the name in
-lower case. Anything else — `Nerd`, `octicons`, a typo — is ignored and the
-default stands, silently, because painting blank cells over a typo is worse than
-ignoring it.
+The plugin reads two `config` files: the copy beside the plugin
+(`cp config.example config`), then the copy in
+`herdr plugin config-dir herdr-pr-tracker`. The second file wins.
+
+To go back, set `GLYPHS=unicode` or delete the line. Use lower case. The plugin
+ignores other values and uses the default.
 
 | Mark | Octicon | | Mark | Octicon |
 |---|---|---|---|---|
 | conflict | `no-entry` | | draft | `git-pull-request-draft` |
 | changes requested | `x-circle` | | workspace open | `git-branch` |
-| checks failing | `x` | | in the conversation | `comment` |
-| unresolved threads | `comment-discussion` | | checks running | `dot-fill` |
+| checks fail | `x` | | in the conversation | `comment` |
+| open threads | `comment-discussion` | | checks in progress | `dot-fill` |
 | review required | `eye` | | approved | `check-circle` |
-| config problem | `alert` | | checks passing | `check` |
-| nothing open | `checklist` | | sidebar refreshing | `sync` |
+| config error | `alert` | | checks pass | `check` |
+| no open pull requests | `checklist` | | sidebar update | `sync` |
 
-It needs a font that has them:
+You need a font with these marks:
 
-| Ghostty | nothing to do — it embeds Symbols Nerd Font 3.4.0 in its own binary |
+| Ghostty | No action. Ghostty contains Symbols Nerd Font 3.4.0 |
 |---|---|
 | **iTerm2** | `brew install --cask font-symbols-only-nerd-font`, then Profiles → Text → "Use a different font for non-ASCII text" |
-| **elsewhere** | any patched [Nerd Font](https://www.nerdfonts.com) as the terminal font |
+| **Other terminals** | Use a patched [Nerd Font](https://www.nerdfonts.com) as the terminal font |
 
-The pane reads its config once, at startup, and reloading the plugin does not
-restart the pane process. So after editing `GLYPHS`, close the widget and let it
-come back:
+The widget reads `config` one time, when it starts. A plugin reload does not
+restart it. After you change `GLYPHS`, close the widget:
 
 ```sh
 herdr plugin pane close <pane-id>   # the id from `herdr pane list`
 ```
 
-A missing glyph is a blank cell rather than an error, so look at the pane once it
-returns. The default stays `unicode`, which needs nothing installed.
+The widget opens again on the next tab change. If the font does not have a
+mark, the cell is blank. Look at the widget to make sure the marks show.
 
-The rules behind the colours and the marks:
+### Rules for colour and marks
 
-- **A clean pull request is uncoloured.** If every row is coloured, the colour
-  tells you nothing.
-- **Emphasis is a second axis, not an eighth colour.** The palette is your Herdr
-  theme's own sixteen and does not grow, so the four signals that are *your*
-  work — a conflict, changes requested, failing checks, unresolved threads —
-  take bold as well as colour. They are also what the header counts as needing
-  you.
-- **A conflict leads, and it is the one signal that leads both views.** Nobody
-  else can resolve it, and nothing else about the pull request can proceed until
-  somebody does — a review and a green build are both answers to a question the
-  branch cannot yet ask. Its column is reserved on every row so the cluster
-  keeps aligning down the pane — with a separator column, so the cluster reads
-  as evenly spaced cells rather than a run of glyphs — which costs every branch
-  name two columns.
-- **A conflict GitHub has not computed yet shows nothing.** Mergeability is
-  worked out lazily, so a pull request opened seconds ago reports neither
-  answer, and that is drawn as silence rather than as a branch that will merge.
-  The cost is that a conflict can appear one poll after the row does. Being
-  *behind* the base branch is deliberately not tracked at all — the only field
-  that reports it reports one merge state at a time, so the answer would go
-  missing on exactly the pull requests that are also blocked on something else.
-- **A cancelled check is not a failure.** A cancelled run is nearly always one
-  you superseded, and colouring it red teaches you to ignore red.
-- **Checks still running are blue, not green.** "CI is still thinking" is the
-  most common state of a fresh pull request, and showing it as passing is
-  misleading.
-- **A draft is dimmed, not greyed out.** A draft with failing checks still shows
-  the failure, in dim red.
-- **Every unresolved thread counts** — including ones you have already replied
-  to. The widget reports what GitHub reports rather than guessing whose turn it
-  is, so a thread the reviewer has not resolved keeps its row yellow.
-- `▪` is the one thing GitHub's own pull request list cannot tell you: which of
-  these you have checked out right now.
+- **A clean pull request has no colour.** If all rows have colour, the colour
+  gives no information.
+- **Bold shows your work.** Your action clears four signals: a conflict,
+  requested changes, failed checks and open threads. These four are bold. The
+  summary counts them as `need you`.
+- **A conflict is first in both views.** The review and the checks do not
+  matter until the conflict is gone. Each row keeps a column for the conflict
+  mark, so the marks stay aligned.
+- **An unknown conflict shows no mark.** GitHub calculates mergeability after a
+  delay. A conflict can show one poll after its row.
+- **The widget does not show "behind the base branch".** GitHub reports only one
+  merge state at a time. That state hides "behind" when another state is also
+  true.
+- **A cancelled check is not a failure.** A new push cancels most of these runs.
+- **Checks in progress are blue, not green.** Green means the checks passed.
+- **A draft is dim.** A failed check on a draft shows in dim red.
+- **All open threads count.** This includes threads that you replied to. The
+  widget shows the GitHub count and does not guess who must act next.
+- **`▪` shows which branches you have checked out.** The GitHub list cannot
+  show this.
 
-Ordering is **oldest first**, by creation date, and it never changes as statuses
-change — rows do not jump around while you glance at them. Drafts stay in date
-position.
+### Order and overflow
 
-If the list is taller than the pane, the rows are **halved before any of them is
-dropped**: the title line goes and its hyperlink moves onto the branch, so a
-squeezed pane still shows every pull request, its signals and its link. Only when
-even that overflows are rows dropped, and then the *oldest* go, with a `… +N
-older` row standing in for them — your newest work is never what falls off the
-end. The marker always sits next to the rows it stands for, so it is the first
-row in this view and the last one in the other (see [Two views](#two-views)).
+The list shows the **oldest first**, by creation date. A status change does not
+move a row.
+
+If the list is too tall for the widget, **each pull request goes to one line**.
+The widget removes the title line and puts the link on the branch.
+
+If one line for each pull request is also too tall, the widget removes the
+oldest rows. A `… +N older` row shows how many it removed. This row is next to
+the rows that it replaces.
 
 ## Two views
 
-The pane lists one of two things, and **the pane's own title says which**:
+The widget title shows the view:
 
-| Pane title | Shows |
+| Title | Shows |
 |---|---|
-| **My PRs** | The pull requests you opened. The default. The *authored* view, in the code and below. |
-| **Awaiting Review** | The pull requests waiting on you: your review was asked for, you have already given one, or you are in the conversation. The *inbound* view. |
+| `My PRs` | The pull requests that you opened. This is the default. The code calls it the *authored* view. |
+| `Awaiting Review` | The pull requests that wait for you. Someone asked for your review, you gave a review, or you are in the conversation. The code calls it the *inbound* view. |
 
-The dim toggle in the middle of the summary line is the control — `toggle view`
-where there is room for it, and just `toggle` where there is not, as in the first
-example above. **Click it** and the pane switches, and the title changes with it.
-No modifier, no setup.
+**Click `toggle` in the summary line** to change the view. No setup is
+necessary. In a narrow widget, the control is `⇄`. In a very narrow widget, the
+control is not there.
 
-The pane reads its own mouse, so a click on any pull request opens it in the
-browser too. The same toggle is reachable from `herdr plugin action invoke` and
-from a keybinding you bind yourself (see below).
-
-The control buys its columns from whatever the summary and the age leave over:
-a narrow pane shortens it to `toggle` and then to `⇄`, and one narrower still
-drops it altogether — the count and the age are what the line exists to say.
+A click on a pull request opens it in the browser. You can also change the view
+with `herdr plugin action invoke` or with a keybinding (see
+[Keybindings](#keybindings)).
 
 ```
     3 inbound · toggle view · 12s ago
@@ -200,58 +181,43 @@ web-app ────────────────────────
      #101 Retry the webhook dispatcher o… 5d
 ```
 
-The inbound view is the same widget with three things changed, all for the same
-reason — the work is somebody else's:
+In the inbound view, the work belongs to another person. Thus:
 
-- **Rows lead with the author**, not the branch. The branch follows it when
-  there are columns spare. Your own branch names are how you think about your
-  own work; somebody else's are not.
-- **`◦` marks a row nobody asked you to look at** — you were assigned,
-  mentioned, or you left a comment. A row with no mark is one where your review
-  was actually requested, which is the ordinary reason to be here.
-- **The colour order nearly inverts below the first place** — the same eight
-  signals, ranked again: conflict, review required, checks running, clean,
-  unresolved threads, failing checks, approved, changes requested. *Conflict*
-  still leads, and it is the only signal that leads both views: to a reviewer a
-  conflicting pull request is not *reviewable*, so "do not read this yet" is the
-  loudest thing the row can say. *Review required* leads the rest, because it is
-  the point of the view. *Changes requested* comes last, because it is usually your own
-  verdict already delivered. Failing checks and unresolved threads sit low for
-  the same reason: they are the author's job, and a red pull request is one it
-  is too early to read.
+- **Each row starts with the author.** The branch comes after the author if
+  there is space.
+- **`◦` shows a row that nobody asked you to review.** Someone assigned you,
+  mentioned you, or you wrote a comment.
+- **The colour order is different.** The order is: conflict, review required,
+  checks in progress, clean, open threads, failed checks, approved, changes
+  requested. A conflict is first because you cannot review it. Requested changes
+  are last because they are usually your own result. Failed checks and open
+  threads are the work of the author.
+- **There is no `need you` count and no bold.** All rows in this view need you.
+- **The list shows the newest first.** GitHub removes a review request after you
+  review. Thus the view also shows pull requests that you reviewed, so that you
+  can see the next step. The oldest rows are the pull requests that you
+  completed. The widget removes these first.
 
-There is no needs-you count, in the summary or on the bands, and no bold,
-because every row in the view needs you. Ordering
-is **newest first** here, the opposite of the authored view, and for a specific
-reason: GitHub drops a review request the moment you review, so this view folds
-in what you have *already* reviewed to let you watch what happens next — which
-means the list does not empty by being worked. Its oldest rows are the ones you
-have already dealt with, so those are what falls off the end.
+The plugin keeps your view after a restart. Each view has its own cache.
 
-The chosen view is remembered across restarts. Each view caches its own list, so
-reopening the pane never shows one view's rows under the other one's heading.
+## Sidebar token
 
-## The sidebar token
-
-The plugin also labels the focused agent pane's sidebar row with that pane's
-branch's pull request — `#21288 ✓`, or `◌#21288 ✓` for a draft. Add `$pr` to your
-agent row to see it:
+The plugin adds a token to the sidebar row of the focused agent pane. The token
+shows the pull request for the branch of that pane:
+`#21288 ✓`, or `◌#21288 ✓` for a draft. To show it, add `$pr` to the agent row:
 
 ```toml
 [ui.sidebar.agents]
 rows = [["state_icon", "workspace", "tab", "$pr"], ["agent"]]
 ```
 
-This replaces the `gh-pr` plugin, which did the same thing.
+This token replaces the `gh-pr` plugin.
 
 ## Requirements
 
-- Herdr >= 0.8.0 — `plugin pane`, `pane report-metadata --title` and
-  `link_handlers` all arrived in it
-- `bun` >= 1.2 — the state files are cleared with `Bun.file().delete()`, which
-  older versions do not have
-- `gh` >= 2.24, with `gh auth status` clean — the check rollup is read from
-  `gh pr checks --json`
+- Herdr 0.8.0 or later
+- `bun` 1.2 or later
+- `gh` 2.24 or later. `gh auth status` must show no errors
 - `git` on your `PATH`
 
 ## Install
@@ -260,65 +226,60 @@ This replaces the `gh-pr` plugin, which did the same thing.
 herdr plugin install jakekroon/herdr-pr-tracker
 ```
 
-That is the whole install — no daemon, no config file, and nothing to build:
-the plugin has no runtime dependencies, so there is no `bun install` step.
+There is no daemon, no config file and no build step.
 
-It prints what it is about to register and asks you to confirm. Where there is
-no terminal to ask — a dotfiles bootstrap, a provisioning script, CI — it
-refuses rather than assuming, so add `--yes`:
+Herdr asks you to confirm the install. A script has no terminal to answer, so
+add `--yes`:
 
 ```bash
 herdr plugin install jakekroon/herdr-pr-tracker --yes
 ```
 
-Pin a version with `--ref` if you would rather not track `main`:
+To use one version, add `--ref`:
 
 ```bash
-herdr plugin install jakekroon/herdr-pr-tracker --ref v0.5.0
+herdr plugin install jakekroon/herdr-pr-tracker --ref v0.5.1
 ```
 
-To work on it instead, link a checkout — the same plugin, read from where you
-edit it:
+To change the plugin, link a local checkout:
 
 ```bash
 herdr plugin link /path/to/herdr-pr-tracker
 ```
 
-### Uninstalling
+### Uninstall
 
-**Close the widget first, then remove the plugin.** The order matters, and
-getting it wrong leaves a process behind:
+**Close the widget before you remove the plugin.** If you remove the plugin
+first, the widget process continues to run:
 
 ```bash
-herdr plugin action invoke herdr-pr-tracker.toggle   # closes the pane
+herdr plugin action invoke herdr-pr-tracker.toggle   # closes the widget
 herdr plugin uninstall herdr-pr-tracker              # or: unlink, for a checkout
 ```
 
-Removing the plugin does not stop the pane. The poll loop lives in the pane
-process — that is what makes the widget work at all — and Herdr leaves it running
-when the plugin it belongs to is unregistered. It then has no owner:
-`herdr plugin pane close` answers `plugin_pane_not_found`, because Herdr will not
-act on a plugin pane whose plugin it has forgotten, while the pane is still
-listed and still asking GitHub for your pull requests every sixty seconds.
+After the uninstall, Herdr does not stop the widget process. The process
+continues to ask GitHub for your pull requests each minute.
+`herdr plugin pane close` cannot find the widget then.
 
-If you have already uninstalled and left one behind, the ordinary pane command
-still reaches it — find it by its `prs` label:
+To close a widget that stays after an uninstall, use the usual pane command.
+The widget has the label `prs`:
 
 ```bash
 herdr pane list | grep prs
 herdr pane close <pane-id>
 ```
 
-Uninstalling leaves the config and state directories alone, so a reinstall keeps
-your width, your chosen view and your cached list. Delete
-`herdr plugin config-dir herdr-pr-tracker` and the plugin's directory under
-`~/.local/state/herdr/plugins` to start clean.
+The uninstall keeps the config and state directories. A new install uses your
+widths, your view and your cache again. To start again with no data, delete
+these two directories:
+
+- `herdr plugin config-dir herdr-pr-tracker`
+- the plugin directory in `~/.local/state/herdr/plugins`
 
 ### Keybindings
 
-A plugin cannot ship its own keybinding — Herdr has no action palette either, so
-clicking the header switcher and `herdr plugin action invoke` are the two routes
-that need no setup. To reach the actions by keystroke, add them to `~/.config/herdr/config.toml` and run `herdr server reload-config`:
+A plugin cannot add a keybinding. To use a key for an action, add it to
+`~/.config/herdr/config.toml`. Then run `herdr server reload-config`:
 
 ```toml
 [[keys.command]]
@@ -340,135 +301,121 @@ command = "herdr-pr-tracker.view-toggle"
 description = "toggle PR view"
 ```
 
-The view toggle opens the pane if it is closed, so it does not need `toggle`
-first.
+`view-toggle` also opens the widget when it is not on the screen.
 
-Avoid `alt+` chords (they emit characters in the terminal), and pick keys that do
-not collide with the built-ins: `o`, `g`, `r`, `v` and `e` are taken.
+Do not use `alt+` keys. They type characters in the terminal. Do not use `o`,
+`g`, `r`, `v` or `e`. Herdr uses these keys.
 
 ## Configuration
 
-Optional. `cp config.example config`, or drop a `config` in
-`herdr plugin config-dir herdr-pr-tracker` — the plugin config dir is read second
-and wins. Every setting is documented in `config.example`. Values may be quoted
-or bare. The pane reads its config once, at startup, so toggle the widget off and
-on after an edit.
+The config is optional. Run `cp config.example config`, or put a `config` in
+`herdr plugin config-dir herdr-pr-tracker`. The second file wins.
+`config.example` gives all settings. You can use quotes on values.
 
-`SEARCH_QUERY` is the whole definition of the **authored** view, so pointing it
-somewhere else re-aims that view entirely.
+The widget reads `config` one time, when it starts. After a change, toggle the
+widget off and on.
 
-It deliberately does not reach the inbound view. That view's three searches are
-what tell a row you were *asked* from a row you are merely *involved* in, and an
-override would change what `◦` means with no way for you to notice.
+### `SEARCH_QUERY`
 
-`IGNORE_REPOS` is repositories and owners the pane never fetches at all, in
-**either** view:
+`SEARCH_QUERY` sets the GitHub search for the authored view. It has no effect on
+the inbound view. The inbound view uses three fixed searches to find the `◦`
+rows.
+
+### `IGNORE_REPOS`
+
+`IGNORE_REPOS` gives repositories and owners that the widget does not get, in
+**both** views:
 
 ```
 IGNORE_REPOS="acme/web-app acme/"
 ```
 
-`acme/web-app` is one repository; `acme/` is every repository under one owner.
-Spaces or commas separate entries, and two spellings of one entry count once —
-GitHub's qualifiers are case-insensitive, so `Acme/Web-App` and `acme/web-app`
-are one ignore.
+- `acme/web-app` is one repository.
+- `acme/` is all repositories of one owner.
+- Use spaces or commas between entries.
+- Case has no effect: `Acme/Web-App` and `acme/web-app` are one entry.
 
-The slash is required. A bare `web-app` is **dropped**, because GitHub answers a
-repository qualifier with no owner by subtracting nothing and reporting no error,
-and a filter that silently does not filter is worse than one that refuses.
+**Each entry must have a slash.** The plugin ignores an entry without a slash,
+such as `web-app`. GitHub accepts that entry, removes nothing and gives no
+error.
 
-A dropped entry is not silent: the pane carries `⚠ 2 bad IGNORE_REPOS entries`
-at the foot of the list — `⚠ 1 bad IGNORE_REPOS entry` for one. That line says
-only how many, because the pane is narrow; to see *which*, run the pane process
-by hand (`bun bin/pane.ts`), which names them on stderr before it takes the
-screen. In a Herdr pane that stderr line is painted and immediately covered, so
-treat the count as the signal and `config` as the place to look.
+For ignored entries, the widget shows `⚠ 2 bad IGNORE_REPOS entries` below the
+list. To find the bad entries, run `bun bin/pane.ts` in a terminal. It writes
+their names to stderr.
 
-The notice reflects the config as it was **when the pane started** — the pane
-reads `config` once — so fixing an entry clears the line at the next restart,
-not at the next poll. Its row is reserved out of the pane's height and cannot be
-pushed off the bottom by a long list, but not out of its width: a very narrow
-pane truncates the message, and one narrower still drops the line rather than
-wrap it and scroll the header away.
+The `⚠` line shows the config from when the widget started. After you correct
+an entry, restart the widget.
 
-This one *does* reach the inbound view, because removing a row cannot change what
-any row that stays means. Both views are subtracted at the search, so the pane
-never learns what it left out: there is no "N ignored" count, and `0 open` with
-`✓ all clear` is a statement about what you track rather than about GitHub.
+The search removes ignored repositories before the widget gets the data. Thus,
+there is no "N ignored" count. `0 open` and `✓ all clear` apply only to what you
+track.
 
-`MAX_IDLE_DAYS` hides pull requests with no update in that many days, in
-**either** view:
+### `MAX_IDLE_DAYS`
+
+`MAX_IDLE_DAYS` hides pull requests with no update for that number of days, in
+**both** views:
 
 ```
 MAX_IDLE_DAYS=30
 ```
 
-"Update" is GitHub's `updated` date: a comment, a push, a review or a label
-keeps a pull request in, however old it is, and so do bots and a CI run
-finishing. The age on a row is still time since it was opened. Like
-`IGNORE_REPOS` it is subtracted at the search, so there is no "N hidden" count.
-Unset or `0` means no cutoff.
+An update is a change to the GitHub `updated` date. A comment, a push, a review,
+a label, a bot or a CI result is an update. The age on the row is the time since
+the pull request opened. There is no "N hidden" count. If you do not set it, or
+set it to `0`, there is no limit.
 
-Signal precedence, sort order and what any mark *means* are deliberately **not**
-configurable. A widget whose meaning depends on settings is a widget you have to
-remember the settings of before you can read it. `GLYPHS` and `COLOR` are not
-exceptions to that — they say what your terminal can draw, not what a row means.
-See [Marks in a Nerd Font](#marks-in-a-nerd-font) for the glyph swap.
+### Fixed behaviour
+
+You cannot change the signal order, the sort order or what a mark means. With
+such a setting, you must remember it before you can read the list. `GLYPHS` and
+`COLOR` change only how the terminal draws the marks.
 
 ## How it works
 
-One `gh api graphql` request per poll fetches every pull request and everything
-about it. Rate-limit cost is charged per `search` field rather than per pull
-request, so the authored view costs the same whatever comes back and the inbound
-view — three searches aliased into one document — costs proportionally more.
-Measured: **5 points for the authored view and 15 for the inbound one**, which at
-the default 60-second poll is a rounding error against the 5000/hour budget.
-Every response carries `rateLimit { cost remaining }`, so you can always check
-rather than trust this paragraph. Unresolved review threads are the reason it is GraphQL and not
-`gh pr list`: `isResolved` exists nowhere else.
+Each poll sends one `gh api graphql` request. The request gets all pull requests
+and their data.
 
-Herdr has no background-poll mechanism for plugins, so the poll loop lives in the
-pane process itself — the one part of a plugin allowed to stay alive. The pane
-follows you between tabs by being *moved* rather than reopened, so the list stays
-on screen through the trip.
+GitHub calculates the rate-limit cost for each `search` field. The authored
+view costs **5 points** for each poll. The inbound view has three searches and
+costs **15 points**. At the default 60-second poll, this is a small part of the
+5000-point hourly limit. Each response contains `rateLimit { cost remaining }`.
 
-It never shows stale data as though it were fresh. The header carries the age of
-what is on screen; past two poll intervals it turns yellow, and a failed refresh
-turns it red and says why (`auth failed`, `offline`, `rate limited`) while still
-admitting how old the rows are. An empty list says `0 open` — `0 inbound` in the other view — and `✓ all clear`, so
-"nothing to do" is never confusable with "the widget is broken". Both counts are
-of what you track: `SEARCH_QUERY` and `IGNORE_REPOS` are applied at the search,
-so anything they exclude was never fetched and is not counted anywhere.
+The plugin uses GraphQL because only GraphQL gives `isResolved` for review
+threads.
 
-The pane takes no keyboard input and cannot be typed into or killed with a
-keystroke. It **does** claim the mouse, in press/release SGR reporting only. That
-reverses the original design, and for a measured reason: on iTerm2 a ctrl-click —
-the modifier Herdr's own link handling is keyed to — never reaches the terminal,
-because macOS claims it as the secondary click. The plain click is the only one a
-pane can act on, and a pane only gets it by claiming the mouse. The cost is that
-Herdr no longer resolves this pane's hyperlinks, so the pane opens them itself,
-and only `http(s)` ones. The clickable spans are derived from the frame that was
-actually painted, so whatever is hyperlinked is clickable.
+Herdr does not run background jobs for plugins. Thus, the poll loop runs in the
+widget process. When you change tabs, the plugin moves the widget. The list stays
+on the screen during the move.
+
+The summary shows the age of the data:
+
+- After two poll intervals, the age is yellow.
+- If a poll fails, the age is red. The summary gives the cause: `auth failed`,
+  `offline` or `rate limited`.
+- An empty list shows `0 open` (or `0 inbound`) and `✓ all clear`.
+
+The widget does not accept keyboard input. It reads the mouse with SGR
+press/release reports.
+
+On iTerm2, macOS uses ctrl-click for its own menu. Thus, a ctrl-click does not
+get to Herdr. The widget must read the mouse to get the plain click. Herdr then
+does not open the links in the widget. The widget opens `http(s)` links itself.
 
 ## Development
 
 ```bash
-tests/run.sh    # everything below, and what CI runs
+tests/run.sh    # all tests and the typecheck. CI runs this.
 ```
 
-or the two halves separately:
+Or run the two parts:
 
 ```bash
 bun test        # no network, no gh, no Herdr
 bunx tsc --noEmit
 ```
 
-`tests/manifest.test.ts` is the one that is not about rendering: it checks the
-manifest against the code it points at, because a stale command path or an
-unmatched link-handler pattern fails at runtime inside a hook, where nobody is
-watching.
+`tests/manifest.test.ts` compares the manifest with the code. A bad command path
+or link pattern fails in a hook at runtime, where you cannot see the error.
 
-The widget's whole design turns on one distinction: **draft is a modifier on
-open, not an alternative to it.** A draft is still open, still yours, and still
-needs you — it is just not asking anyone else for anything yet, so it is dimmed
-rather than dropped.
+A draft is open. It is still your work, so the widget shows it dim and does not
+remove it.

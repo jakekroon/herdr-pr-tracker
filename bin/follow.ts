@@ -29,6 +29,7 @@ import {
   moveRatio,
   ratioChanged,
   shouldRecordWidth,
+  stackPartner,
   usableRatio,
   WIDGET_LABEL,
   widthStep,
@@ -44,17 +45,16 @@ import {
 } from "../src/herdr.ts";
 import {
   clearPaneId,
-  clearPlacedRatio,
   placementInFlight,
   readPaneId,
-  readPlacedRatio,
+  readTabWidth,
   readView,
-  readWidthRatio,
+  recordPlacedWidth,
+  recordStack,
+  recordTabWidth,
   releasePlacementLock,
   takePlacementLock,
   writePaneId,
-  writePlacedRatio,
-  writeWidthRatio,
 } from "../src/state.ts";
 import { VIEW_TITLE } from "../src/view.ts";
 
@@ -146,10 +146,15 @@ async function applyWidth(paneId: string, desired: number): Promise<number | nul
  * tell that width from a drag. Writing down what the arithmetic achieved is what
  * makes the two distinguishable.
  */
-async function settleWidth(paneId: string, desired: number): Promise<void> {
-  const reached = usableRatio(await applyWidth(paneId, desired));
-  if (reached != null) await writePlacedRatio(reached);
-  else await clearPlacedRatio();
+async function settleWidth(paneId: string, tabId: string | undefined, desired: number): Promise<void> {
+  recordPlacedWidth(tabId, usableRatio(await applyWidth(paneId, desired)));
+}
+
+/** The width remembered for a tab, or the default for a tab never docked in.
+ * A stored value outside the believable band is treated as absent rather than
+ * clamped, so a bad record costs one dock at the default. */
+function widthFor(tabId: string | undefined): number {
+  return usableRatio(readTabWidth(tabId).width) ?? DEFAULT_WIDTH_RATIO;
 }
 
 /**
@@ -161,15 +166,22 @@ async function settleWidth(paneId: string, desired: number): Promise<void> {
  * you left. So the width is read off the widget where it still stands, before
  * moving it, which is the last moment the user's choice is observable.
  */
-async function widthLeftBehind(paneId: string): Promise<number | null> {
+async function recordWidthLeftBehind(paneId: string): Promise<void> {
   const home = await layout(paneId);
   const there = home?.panes.find((p) => p.pane_id === paneId);
-  if (!home || !there || home.zoomed) return null;
-  return usableRatio(paneRatio(there.rect.width, home.area?.width ?? 0));
+  if (!home || !there || home.zoomed) return;
+  recordStack(home.tab_id, stackPartner(home.panes, paneId));
+  const left = usableRatio(paneRatio(there.rect.width, home.area?.width ?? 0));
+  // Same hazard as the settled path: the width standing in the old tab is a
+  // drag only if it is not the width the last placement there managed to reach.
+  const was = readTabWidth(home.tab_id);
+  if (left != null && shouldRecordWidth(left, usableRatio(was.width), usableRatio(was.placed))) {
+    recordTabWidth(home.tab_id, left);
+  }
 }
 
-async function place(l: Layout, stored: number | null, recorded: string | null): Promise<number> {
-  let desired = stored ?? DEFAULT_WIDTH_RATIO;
+async function place(l: Layout, recorded: string | null): Promise<number> {
+  const desired = widthFor(l.tab_id);
 
   // The recorded id is absent from this tab: either the widget is in another
   // tab, or the id is stale. Both are answered by looking at what exists.
@@ -180,7 +192,7 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
   // remembered width is restored, since the width it came back at is not one the
   // user chose.
   if (known && l.panes.some((p) => p.pane_id === known)) {
-    await settleWidth(known, desired);
+    await settleWidth(known, l.tab_id, desired);
     return 0;
   }
 
@@ -188,16 +200,28 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
   if (!target) return 0;
 
   if (known) {
-    // Carry the width across rather than re-imposing the stored one: the widget
-    // is still standing in its old tab, so this is the one chance to see a drag
-    // that no settled run ever got to observe.
-    // Same hazard as the settled path: the width standing in the old tab is a
-    // drag only if it is not the width the last placement managed to reach.
-    const left = await widthLeftBehind(known);
-    if (left != null && shouldRecordWidth(left, stored, usableRatio(await readPlacedRatio()))) {
-      await writeWidthRatio(left);
-      await clearPlacedRatio();
-      desired = left;
+    // The widget is still standing in its old tab, so this is the one chance
+    // to see a drag there that no settled run ever got to observe. It is
+    // recorded for that tab only; this tab keeps its own width.
+    await recordWidthLeftBehind(known);
+
+    // The user split the widget's pane top and bottom when it was last here,
+    // so it goes back under that pane rather than beside it. The column's
+    // width is the partner's, so there is no width to walk.
+    const stack = readTabWidth(l.tab_id).stack;
+    if (stack && l.panes.some((p) => p.pane_id === stack.pane)) {
+      const moved = await movePane(known, {
+        tabId: l.tab_id,
+        targetPane: stack.pane,
+        split: "down",
+        ratio: stack.keep,
+      });
+      const after = moved ? await layout() : null;
+      const placed = after ? await reconcile(after.tab_id, moved) : null;
+      if (placed && after?.panes.some((p) => p.pane_id === placed)) {
+        await resyncPane(placed);
+        return 0;
+      }
     }
 
     // Relocate rather than close-and-reopen: the renderer process survives the
@@ -224,7 +248,7 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
         // Corrective only. With the complement ratio the widget arrives at its
         // final width and this finds nothing to do; it earns its keep when the
         // target was too narrow to give up the columns.
-        await settleWidth(placed, desired);
+        await settleWidth(placed, l.tab_id, desired);
         // Herdr sized this tab's ptys before the widget arrived, so the pane
         // beside it still has its widget-less pty. The walk above resizes only
         // a width that is off, and the complement ratio rarely leaves one.
@@ -244,7 +268,7 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
   });
   if (!opened) return 1;
   await writePaneId(opened);
-  await settleWidth(opened, desired);
+  await settleWidth(opened, l.tab_id, desired);
   await resyncPane(opened);
   return 0;
 }
@@ -252,12 +276,6 @@ async function place(l: Layout, stored: number | null, recorded: string | null):
 async function main(): Promise<number> {
   const l = await layout();
   if (!l) return 0;
-
-  // The width the user last left the widget at, if any. A stored value outside
-  // the believable band is treated as absent rather than clamped, so a bad
-  // record costs one dock at the default instead of persisting forever.
-  const stored = usableRatio(await readWidthRatio());
-  const desired = stored ?? DEFAULT_WIDTH_RATIO;
 
   const recorded = await readPaneId();
   const settled = recorded ? l.panes.find((p) => p.pane_id === recorded) : undefined;
@@ -277,21 +295,18 @@ async function main(): Promise<number> {
   if (settled) {
     if (!l.zoomed) {
       const measured = usableRatio(paneRatio(settled.rect.width, l.area?.width ?? 0));
-      // Two cheap guards before any file read, because the overwhelmingly
-      // common case is a width that has not moved at all:
-      //
-      //   - nothing changed, so there is nothing to record;
-      //   - a placement is still walking this pane, so the width on screen is
-      //     mid-arithmetic. `placed_ratio` cannot rule that out — it is not
-      //     written until the walk ends — so the lock is what answers it.
-      if (measured != null && ratioChanged(measured, stored) && !placementInFlight()) {
-        const placed = usableRatio(await readPlacedRatio());
-        if (shouldRecordWidth(measured, stored, placed)) {
-          await writeWidthRatio(measured);
-          // The user has now chosen a width, so the last placement's shortfall
-          // is no longer the explanation for anything.
-          await clearPlacedRatio();
-        }
+      const here = readTabWidth(l.tab_id);
+      const stored = usableRatio(here.width);
+      // A placement still walking this pane leaves the width on screen
+      // mid-arithmetic. `placed` cannot rule that out — it is not written until
+      // the walk ends — so the lock is what answers it.
+      if (
+        measured != null &&
+        ratioChanged(measured, stored) &&
+        !placementInFlight() &&
+        shouldRecordWidth(measured, stored, usableRatio(here.placed))
+      ) {
+        recordTabWidth(l.tab_id, measured);
       }
     }
     return 0;
@@ -303,7 +318,7 @@ async function main(): Promise<number> {
   if (!(await takePlacementLock())) return 0;
   let code: number;
   try {
-    code = await place(l, stored, recorded);
+    code = await place(l, recorded);
   } finally {
     releasePlacementLock();
   }
