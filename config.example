@@ -95,6 +95,23 @@
 # loud, and not something you could mistake for a filter that is working.
 #IGNORE_REPOS=""
 
+# Authors whose pull requests are never fetched, in either view. Same
+# separators, case rule, dedup and `⚠` count as IGNORE_REPOS.
+#
+#   IGNORE_AUTHORS="octocat renovate[bot] app/dependabot"
+#
+#   octocat          a user login
+#   renovate[bot]    a bot login, with its suffix
+#   app/dependabot   a GitHub App, the same as dependabot[bot]
+#   @octocat         an ERROR — dropped
+#   acme/web-app     an ERROR — dropped (that is IGNORE_REPOS)
+#
+# A bot needs its `[bot]` suffix or the `app/` prefix. GitHub reports
+# Dependabot's login as `dependabot`, but `-author:dependabot` subtracts nothing
+# and reports no error. A bare bot name is also a valid user login, so the
+# parser cannot catch it.
+#IGNORE_AUTHORS=""
+
 # Hide pull requests with no update in this many days, in either view. Unset,
 # 0, or a value that does not start with a positive number leaves every pull
 # request in.

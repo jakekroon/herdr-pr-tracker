@@ -6,7 +6,7 @@
 // process, which is the one part of a plugin that is allowed to stay alive.
 
 import { dirname, join } from "node:path";
-import { ignoreNotice, ignoreWarning, loadConfig } from "../src/config.ts";
+import { configNotice, configWarnings, loadConfig } from "../src/config.ts";
 import { fetchInbound, fetchPrs, GhError } from "../src/gh.ts";
 import { listPanes, listWorkspaces, setPaneTitle } from "../src/herdr.ts";
 import type { PrRow } from "../src/model.ts";
@@ -49,11 +49,12 @@ const cfg = await loadConfig(PLUGIN_ROOT, process.env.HERDR_PLUGIN_CONFIG_DIR);
 // The protection against a malformed entry is that it is dropped rather than
 // sent; being told about it is the lesser half, and this is as far as it goes
 // without spending header columns the list wants.
-const warning = ignoreWarning(cfg.ignoreDropped);
-if (warning) console.error(`herdr-pr-tracker: ${warning}`);
+for (const warning of configWarnings(cfg)) console.error(`herdr-pr-tracker: ${warning}`);
 // The half of that the reader will actually see. Short, because the pane is
 // narrow; the stderr line above names the entries.
-const startupNotice = ignoreNotice(cfg.ignoreDropped);
+const startupNotice = configNotice(cfg);
+// One list, so both views subtract repositories and authors alike.
+const ignore = [...cfg.ignore, ...cfg.ignoreAuthors];
 
 let rows: PrRow[] = [];
 let omitted = 0;
@@ -271,8 +272,8 @@ async function refresh(target: View) {
     // The inbound view is deliberately not `fetchPrs` with a different query:
     // it is three searches and a dedup, and its rows carry a reason.
     const list = target === "inbound"
-      ? await fetchInbound(cfg.maxPrs, cfg.ignore, cfg.maxIdleDays)
-      : await fetchPrs(cfg.searchQuery, cfg.maxPrs, cfg.ignore, cfg.maxIdleDays);
+      ? await fetchInbound(cfg.maxPrs, ignore, cfg.maxIdleDays)
+      : await fetchPrs(cfg.searchQuery, cfg.maxPrs, ignore, cfg.maxIdleDays);
     // Workspace linkage is local and cheap, and a failure to read it must not
     // discard a good PR fetch — so it degrades to "nothing linked".
     let linked = list.rows;

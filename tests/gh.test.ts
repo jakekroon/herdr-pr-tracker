@@ -62,8 +62,9 @@ describe("the ignore list reaches every search", () => {
   const IGNORED: IgnoreEntry[] = [
     { kind: "repo", owner: "acme", name: "web-app" },
     { kind: "owner", owner: "initech" },
+    { kind: "author", login: "renovate[bot]" },
   ];
-  const SUBTRACTED = ["-repo:acme/web-app", "-user:initech"];
+  const SUBTRACTED = ["-repo:acme/web-app", "-user:initech", "-author:renovate[bot]"];
 
   const REQUESTS: Array<[string, string[], number]> = [
     ["authored", searchArgs("is:pr is:open author:@me", 100, IGNORED, null, 100), 1],

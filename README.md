@@ -350,6 +350,30 @@ The search removes ignored repositories before the widget gets the data. Thus,
 there is no "N ignored" count. `0 open` and `✓ all clear` apply only to what you
 track.
 
+### `IGNORE_AUTHORS`
+
+`IGNORE_AUTHORS` gives authors whose pull requests the widget does not get, in
+**both** views:
+
+```
+IGNORE_AUTHORS="octocat renovate[bot] app/dependabot"
+```
+
+- `octocat` is a user login.
+- `renovate[bot]` is a bot login. A bot needs the `[bot]` suffix.
+- `app/dependabot` is a GitHub App. It is the same as `dependabot[bot]`.
+- Use spaces or commas between entries.
+- Case has no effect.
+
+**A bot without `[bot]` removes nothing.** GitHub shows Dependabot's login as
+`dependabot`, but `-author:dependabot` matches no pull requests and gives no
+error. The plugin cannot find this mistake, because `dependabot` is also a
+valid user login.
+
+The plugin ignores an entry with `@` or a slash, such as `@octocat` or
+`acme/web-app`. The widget shows `⚠ 1 bad IGNORE_AUTHORS entry` below the list,
+as for `IGNORE_REPOS`.
+
 ### `MAX_IDLE_DAYS`
 
 `MAX_IDLE_DAYS` hides pull requests with no update for that number of days, in

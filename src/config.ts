@@ -34,6 +34,12 @@ export interface Config {
    * than warned about here so the pure layer stays pure and only the pane —
    * not the sidebar token, which shares this loader — does the complaining. */
   ignoreDropped: string[];
+  /** Authors whose pull requests are never fetched, in either view. Its own
+   * field rather than more of `ignore`, so a config file that sets only one of
+   * the two keys does not reset the other when `loadConfig` merges files. */
+  ignoreAuthors: IgnoreEntry[];
+  /** Author entries the parser refused, verbatim. */
+  ignoreAuthorsDropped: string[];
   /** Pull requests with no update in this many days are never fetched, in
    * either view. `null` is no cutoff. */
   maxIdleDays: number | null;
@@ -49,6 +55,8 @@ export const DEFAULTS: Config = {
   tokenThrottleSeconds: 30,
   ignore: [],
   ignoreDropped: [],
+  ignoreAuthors: [],
+  ignoreAuthorsDropped: [],
   maxIdleDays: null,
 };
 
@@ -85,29 +93,57 @@ const VALID_REPO_NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
 function parseIgnoreList(
   raw: string,
 ): { entries: IgnoreEntry[]; dropped: string[] } {
+  return parseList(raw, (token) => {
+    const slash = token.indexOf("/");
+    const owner = slash < 0 ? "" : token.slice(0, slash);
+    const name = slash < 0 ? "" : token.slice(slash + 1);
+    const ok = slash >= 0 && VALID_OWNER.test(owner) &&
+      (name === "" || VALID_REPO_NAME.test(name));
+    if (!ok) return null;
+    return name === "" ? { kind: "owner", owner } : { kind: "repo", owner, name };
+  });
+}
+
+/**
+ * Split `IGNORE_AUTHORS` into entries, refusing anything that is not a login.
+ *
+ * Three shapes, all passed to GitHub verbatim: a user's login, a bot's login
+ * with its `[bot]` suffix, and `app/<slug>`. A bot is the trap. GitHub reports
+ * Dependabot's login as `dependabot`, but probed against the live API,
+ * `-author:dependabot` subtracts nothing and reports no error, while
+ * `-author:dependabot[bot]` and `-author:app/dependabot` both subtract it. A
+ * bare bot name is a valid login shape, so the parser cannot refuse it.
+ *
+ * A slash outside `app/` and a leading `@` are refused: the first is an
+ * `IGNORE_REPOS` entry in the wrong key, and the second is a paste-shape.
+ */
+function parseAuthorList(
+  raw: string,
+): { entries: IgnoreEntry[]; dropped: string[] } {
+  return parseList(raw, (token) => {
+    const app = /^app\//i.test(token) ? token.slice(4) : null;
+    const base = app ?? token.replace(/\[bot\]$/i, "");
+    return VALID_OWNER.test(base) ? { kind: "author", login: token } : null;
+  });
+}
+
+/** The split, dedup and refusal shared by both ignore keys. */
+function parseList(
+  raw: string,
+  entryOf: (token: string) => IgnoreEntry | null,
+): { entries: IgnoreEntry[]; dropped: string[] } {
   const entries: IgnoreEntry[] = [];
   const dropped: string[] = [];
   const seen = new Set<string>();
 
   for (const token of raw.split(/[\s,]+/)) {
     if (!token) continue;
-    const slash = token.indexOf("/");
-    const owner = slash < 0 ? "" : token.slice(0, slash);
-    const name = slash < 0 ? "" : token.slice(slash + 1);
-    const ok = slash >= 0 && VALID_OWNER.test(owner) &&
-      (name === "" || VALID_REPO_NAME.test(name));
     const key = token.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!ok) {
-      dropped.push(token);
-      continue;
-    }
-    entries.push(
-      name === ""
-        ? { kind: "owner", owner }
-        : { kind: "repo", owner, name },
-    );
+    const entry = entryOf(token);
+    if (entry) entries.push(entry);
+    else dropped.push(token);
   }
   return { entries, dropped };
 }
@@ -127,13 +163,23 @@ function entryNoun(n: number): string {
  * living outside `state.ts`: the pane is the I/O layer the tests never exercise,
  * so a sentence composed there is a sentence that can never go red.
  */
-export function ignoreWarning(dropped: readonly string[]): string | null {
+export function ignoreWarning(
+  dropped: readonly string[],
+  key: IgnoreKey = "IGNORE_REPOS",
+): string | null {
   if (dropped.length === 0) return null;
-  return `dropped ${dropped.length} malformed IGNORE_REPOS ` +
-    `${entryNoun(dropped.length)} (${dropped.join(", ")}) — each needs an ` +
-    `owner: "owner/name", or ` +
-    `"owner/" for every repository under one owner`;
+  return `dropped ${dropped.length} malformed ${key} ` +
+    `${entryNoun(dropped.length)} (${dropped.join(", ")}) — ${HINT[key]}`;
 }
+
+/** The config keys that carry an ignore list. */
+export type IgnoreKey = "IGNORE_REPOS" | "IGNORE_AUTHORS";
+
+const HINT: Record<IgnoreKey, string> = {
+  IGNORE_REPOS: `each needs an owner: "owner/name", or ` +
+    `"owner/" for every repository under one owner`,
+  IGNORE_AUTHORS: `each must be a login, "name[bot]", or "app/name"`,
+};
 
 /**
  * The same refusal, short enough for the pane.
@@ -144,9 +190,34 @@ export function ignoreWarning(dropped: readonly string[]): string | null {
  * the config file for which. Both count the same list, so they cannot disagree
  * about whether there is a problem.
  */
-export function ignoreNotice(dropped: readonly string[]): string | null {
+export function ignoreNotice(
+  dropped: readonly string[],
+  key: IgnoreKey = "IGNORE_REPOS",
+): string | null {
   if (dropped.length === 0) return null;
-  return `${dropped.length} bad IGNORE_REPOS ${entryNoun(dropped.length)}`;
+  return `${dropped.length} bad ${key} ${entryNoun(dropped.length)}`;
+}
+
+/** Both keys' refusals as one pane line, or null when both are clean. The pane
+ * has one notice line, so two keys share it rather than one hiding the other. */
+export function configNotice(
+  cfg: Pick<Config, "ignoreDropped" | "ignoreAuthorsDropped">,
+): string | null {
+  const parts = [
+    ignoreNotice(cfg.ignoreDropped, "IGNORE_REPOS"),
+    ignoreNotice(cfg.ignoreAuthorsDropped, "IGNORE_AUTHORS"),
+  ].filter((n): n is string => n != null);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/** Both keys' refusals, one stderr line each. */
+export function configWarnings(
+  cfg: Pick<Config, "ignoreDropped" | "ignoreAuthorsDropped">,
+): string[] {
+  return [
+    ignoreWarning(cfg.ignoreDropped, "IGNORE_REPOS"),
+    ignoreWarning(cfg.ignoreAuthorsDropped, "IGNORE_AUTHORS"),
+  ].filter((w): w is string => w != null);
 }
 
 /** Parse `KEY=value` lines. Shell-shaped so the file is interchangeable with
@@ -194,6 +265,11 @@ export function parseConfig(text: string): Partial<Config> {
     const { entries, dropped } = parseIgnoreList(out.IGNORE_REPOS);
     cfg.ignore = entries;
     cfg.ignoreDropped = dropped;
+  }
+  if (out.IGNORE_AUTHORS != null) {
+    const { entries, dropped } = parseAuthorList(out.IGNORE_AUTHORS);
+    cfg.ignoreAuthors = entries;
+    cfg.ignoreAuthorsDropped = dropped;
   }
   if (out.COLOR != null || out.COLOUR != null) {
     const v = (out.COLOR ?? out.COLOUR)!.toLowerCase();
