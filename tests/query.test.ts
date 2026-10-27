@@ -129,6 +129,15 @@ describe("withIgnores", () => {
     expect(withIgnores("Q", [ownerOf("acme")])).toBe("Q -user:acme");
   });
 
+  test("an author becomes a negated author qualifier, verbatim", () => {
+    // Verbatim because a bot only matches with its suffix or its app prefix:
+    // probed, `-author:dependabot` subtracts nothing.
+    expect(withIgnores("Q", [{ kind: "author", login: "renovate[bot]" }]))
+      .toBe("Q -author:renovate[bot]");
+    expect(withIgnores("Q", [{ kind: "author", login: "app/dependabot" }]))
+      .toBe("Q -author:app/dependabot");
+  });
+
   test("every entry is emitted, in order", () => {
     expect(withIgnores("Q", [repo("acme", "web-app"), ownerOf("other")]))
       .toBe("Q -repo:acme/web-app -user:other");

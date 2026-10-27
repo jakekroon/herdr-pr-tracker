@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  configNotice,
+  configWarnings,
   DEFAULTS,
   ignoreNotice,
   ignoreWarning,
@@ -188,6 +190,70 @@ describe("IGNORE_REPOS", () => {
 
   test("one mistake is reported once, however many times it is made", () => {
     expect(dropped('"web-app web-app WEB-APP"')).toEqual(["web-app"]);
+  });
+});
+
+describe("IGNORE_AUTHORS", () => {
+  const authors = (v: string) => parseConfig(`IGNORE_AUTHORS=${v}`).ignoreAuthors;
+  const dropped = (v: string) => parseConfig(`IGNORE_AUTHORS=${v}`).ignoreAuthorsDropped;
+
+  test("is empty by default", () => {
+    expect(DEFAULTS.ignoreAuthors).toEqual([]);
+    expect(DEFAULTS.ignoreAuthorsDropped).toEqual([]);
+  });
+
+  test("accepts a login, a bot login and an app slug, verbatim", () => {
+    expect(authors('"octocat, renovate[bot] app/dependabot"')).toEqual([
+      { kind: "author", login: "octocat" },
+      { kind: "author", login: "renovate[bot]" },
+      { kind: "author", login: "app/dependabot" },
+    ]);
+  });
+
+  test("refuses a repository, a paste-shape and an empty slug", () => {
+    expect(dropped('"acme/web-app @octocat app/ [bot] -octocat"'))
+      .toEqual(["acme/web-app", "@octocat", "app/", "[bot]", "-octocat"]);
+  });
+
+  test("refuses a login longer than GitHub allows", () => {
+    expect(authors("a".repeat(40))).toEqual([]);
+    expect(authors("a".repeat(39))).toHaveLength(1);
+  });
+
+  test("duplicates collapse case-insensitively", () => {
+    expect(authors('"Octocat octocat"')).toHaveLength(1);
+  });
+
+  test("does not touch IGNORE_REPOS, so two config files merge", () => {
+    const cfg = parseConfig("IGNORE_AUTHORS=octocat");
+    expect(cfg.ignore).toBeUndefined();
+    expect(cfg.ignoreDropped).toBeUndefined();
+    expect(parseConfig("IGNORE_REPOS=acme/").ignoreAuthors).toBeUndefined();
+  });
+});
+
+describe("configNotice and configWarnings", () => {
+  const clean = { ignoreDropped: [], ignoreAuthorsDropped: [] };
+
+  test("say nothing when both keys are clean", () => {
+    expect(configNotice(clean)).toBeNull();
+    expect(configWarnings(clean)).toEqual([]);
+  });
+
+  test("name the key that holds the bad entry", () => {
+    const cfg = { ...clean, ignoreAuthorsDropped: ["@octocat"] };
+    expect(configNotice(cfg)).toBe("1 bad IGNORE_AUTHORS entry");
+    expect(configWarnings(cfg)).toEqual([
+      expect.stringContaining("1 malformed IGNORE_AUTHORS entry (@octocat)"),
+    ]);
+    expect(configWarnings(cfg)[0]).toContain('"app/name"');
+  });
+
+  test("report both keys rather than one hiding the other", () => {
+    const cfg = { ignoreDropped: ["web-app"], ignoreAuthorsDropped: ["a", "b"] };
+    expect(configNotice(cfg))
+      .toBe("1 bad IGNORE_REPOS entry · 2 bad IGNORE_AUTHORS entries");
+    expect(configWarnings(cfg)).toHaveLength(2);
   });
 });
 

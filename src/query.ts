@@ -156,7 +156,20 @@ export const DEFAULT_SEARCH = "is:pr is:open author:@me archived:false";
  */
 export type IgnoreEntry =
   | { kind: "repo"; owner: string; name: string }
-  | { kind: "owner"; owner: string };
+  | { kind: "owner"; owner: string }
+  | { kind: "author"; login: string };
+
+/** The negated qualifier one entry adds to a search. */
+function negation(e: IgnoreEntry): string {
+  switch (e.kind) {
+    case "repo":
+      return `-repo:${e.owner}/${e.name}`;
+    case "owner":
+      return `-user:${e.owner}`;
+    case "author":
+      return `-author:${e.login}`;
+  }
+}
 
 /**
  * A search with the ignore list subtracted from it.
@@ -181,12 +194,7 @@ export type IgnoreEntry =
  * GitHub's search grammar, which this plugin has no business knowing.
  */
 export function withIgnores(q: string, entries: readonly IgnoreEntry[]): string {
-  return entries.reduce(
-    (acc, e) =>
-      acc +
-      (e.kind === "repo" ? ` -repo:${e.owner}/${e.name}` : ` -user:${e.owner}`),
-    q,
-  );
+  return entries.reduce((acc, e) => `${acc} ${negation(e)}`, q);
 }
 
 // --- idle cutoff -------------------------------------------------------------
