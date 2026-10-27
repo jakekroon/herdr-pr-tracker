@@ -1,98 +1,52 @@
-# herdr-pr-tracker — configuration.
+# herdr-pr-tracker configuration.
 #
 #   cp config.example config
 #
-# `config` is gitignored: it is yours, and this file is what ships. Two
-# locations are read — this one (the repo root, handy while the plugin is linked
-# live) and then the plugin config dir, which is read second and so wins:
+# `config` is gitignored. The plugin reads two locations: the repo root, then
+# the plugin config dir, which wins:
 #
 #   herdr plugin config-dir herdr-pr-tracker
 #
-# Everything is commented out at its default. The pane reads its config once at
-# startup, so toggle the widget off and on after editing — including to clear
-# the warning below.
+# Every setting is commented out at its default. `KEY=value`, one per line. A
+# matched pair of single or double quotes around a value is stripped.
 #
-# `KEY=value`, one per line, `#` comments a line out. A value may be quoted or
-# bare; a matched pair of single or double quotes is stripped.
+# The pane reads this file once, at startup, and a plugin reload does not
+# restart the pane process. After an edit, close the widget:
+# `herdr plugin pane close <pane-id>`.
 #
-# Signal precedence and sort order are deliberately NOT configurable, and
-# neither is what any mark means. A widget whose meaning depends on settings is
-# a widget you have to remember the settings of before you can read it. GLYPHS
-# and COLOR are not exceptions to that: they say what this terminal can draw,
-# not what a row means.
+# Signal precedence, sort order and the meaning of each mark are fixed.
 
-# Seconds between GitHub polls. Rate-limit cost is charged per `search` field
-# rather than per pull request, so a poll costs the same whatever comes back —
-# a rounding error against the 5000/hour GraphQL budget at any sane interval.
-# The exact point count is deliberately not quoted here: read `rateLimit.cost`
-# off a live response if it matters. The limit is your attention, not the API.
+# Seconds between GitHub polls. A poll costs the same however many PRs come
+# back.
 #POLL_SECONDS=60
 
-# The GitHub search. This is the one knob that changes *what* is tracked, and it
-# re-aims the **authored** view entirely — narrow it to one org, say, with
-# `user:acme`. `archived:false` keeps unmergeable PRs in archived repos out.
-#
-# Do NOT point it at `review-requested:@me` to watch other people's PRs: that is
-# what the second view is for (toggle it from the pane header), and it is not
-# the same thing. The inbound view leads its rows with the author, ranks the
-# signals for a reviewer rather than an author, and marks the pull requests
-# nobody actually asked you about. Routed through here those rows would be
-# rendered as though they were yours.
-#
-# This setting deliberately does not reach the inbound view at all.
+# The GitHub search for the authored view, e.g. add `user:acme` to narrow it to
+# one org. It does not reach the inbound view. To watch other people's PRs, use
+# the inbound view (toggle it from the pane header), not `review-requested:@me`
+# here: this view would render those rows as yours.
 #SEARCH_QUERY="is:pr is:open author:@me archived:false"
 
-# Repositories and owners whose pull requests are never fetched, at all, in
-# either view. Separate entries with spaces or commas. Duplicates collapse, and
-# they collapse case-insensitively: GitHub's qualifiers ignore case, so
-# `Acme/Web-App` and `acme/web-app` are one ignore and count once in the warning
-# below.
+# Repositories and owners to exclude from both views. Separate entries with
+# spaces or commas. Matching ignores case.
 #
 #   IGNORE_REPOS="acme/web-app acme/metrics-service"
 #
-# The slash carries the meaning, and it is not optional:
-#
 #   acme/web-app   one repository
 #   acme/          every repository under one owner
-#   web-app        an ERROR — dropped (see below)
+#   web-app        an ERROR: dropped
+#
+# GitHub answers a qualifier with no owner by subtracting nothing, with no
+# error, so the plugin refuses a bare name instead of guessing.
 #
 # A dropped entry shows at the foot of the list as `⚠ 2 bad IGNORE_REPOS
-# entries` — `⚠ 1 bad IGNORE_REPOS entry` for one — the count only, because the
-# pane is narrow. To see *which* entries, run `bun bin/pane.ts` by hand: it
-# names them on stderr before it takes the screen. Inside a Herdr pane that line
-# is painted and immediately covered, so the count is the signal you get.
+# entries`. To see which entries, run `bun bin/pane.ts` by hand: it names them
+# on stderr.
 #
-# The warning is computed at startup along with the rest of this file, so fixing
-# an entry clears it at the next restart rather than at the next poll. Its line
-# is reserved out of the pane's height and cannot be crowded out by a long list;
-# its width is not reserved, so a very narrow pane truncates the message and one
-# narrower still drops the line rather than wrap it over the header.
-#
-# A bare name looks like the obvious thing to type and is exactly what must not
-# be guessed at: GitHub answers a repository qualifier with no owner by
-# subtracting nothing and reporting no error, so a parser that guessed would
-# hand you a filter that silently does not filter. There is no owner wildcard
-# to fall back on.
-#
-# Unlike SEARCH_QUERY this **does** reach the inbound view, because it can only
-# remove rows — it cannot relabel a row that stays, which is the thing the
-# inbound searches are protected from.
-#
-# Two consequences of subtracting at the search rather than hiding at the paint.
-# Ignored pull requests cost no page budget, so a noisy repository stops
-# crowding others out of MAX_PRS. And the pane never learns what it dropped, so
-# there is no "N ignored" marker, and `0 open · ✓ all clear` is a claim about
-# what you track rather than about GitHub — which is already true of
-# SEARCH_QUERY. A typo in an otherwise well-formed entry cannot be detected
-# either: it subtracts nothing, and looks exactly like an entry that works.
-#
-# Each entry adds a negated qualifier to every search, so the query grows with
-# the list. Forty negations were probed against the live API and accepted; no
-# ceiling above that has been measured. There is no cap enforced here, because a
-# cap has to drop entries to enforce itself, and a silently dropped ignore is the
-# failure this whole setting is shaped against. If a list ever does grow past
-# what GitHub will take, that arrives as a failed refresh in the pane header —
-# loud, and not something you could mistake for a filter that is working.
+# The search subtracts ignored PRs, so they cost no MAX_PRS budget and the pane
+# never counts them. A typo in a well-formed entry subtracts nothing and gives
+# no warning. Each entry adds a negated qualifier to every search; GitHub
+# accepted forty. A list GitHub refuses shows as a failed refresh in the pane
+# header.
 #IGNORE_REPOS=""
 
 # Authors whose pull requests are never fetched, in either view. Same
@@ -112,71 +66,50 @@
 # parser cannot catch it.
 #IGNORE_AUTHORS=""
 
-# Hide pull requests with no update in this many days, in either view. Unset,
-# 0, or a value that does not start with a positive number leaves every pull
-# request in.
+# Hide PRs with no update in this many days, in both views. Unset, 0, or a
+# non-number keeps every PR.
 #
 #   MAX_IDLE_DAYS=30
 #
-# "Update" is GitHub's `updated` date, so a comment, a push, a review or a
-# label keeps a pull request in, however long ago it was opened. So does
-# activity you did not cause: a bot comment, a Dependabot rebase, a CI run
-# finishing. The age on each row is still the time since the pull request was
-# opened, so a row can read `200d` and still pass the cutoff.
-#
-# Like IGNORE_REPOS it is subtracted at the search, so hidden pull requests
-# cost no page budget and the pane never counts them. `✓ all clear` then means
-# nothing active needs you, and idle pull requests may still be open. It
-# reaches a custom SEARCH_QUERY too. The boundary is a UTC date, so it is only
-# good to the day.
+# "Update" is GitHub's `updated` date: a comment, push, review, label, bot
+# comment or CI run counts. The age on each row is the time since the PR
+# opened, so a row can read `200d` and still pass. The search subtracts hidden
+# PRs, so `✓ all clear` can still leave idle PRs open. The cutoff is a UTC date.
 #MAX_IDLE_DAYS=
 
-# Maximum PRs fetched in one request (GitHub's search page cap is 100). PRs
-# beyond this are counted in the "+N older" row rather than silently dropped.
+# Maximum PRs fetched in one request (GitHub's search page cap is 100). The
+# "+N older" row counts the PRs beyond this.
 #MAX_PRS=100
 
 # auto | always | never. `auto` shows the owner only when a PR's owner differs
-# from the one most of your PRs share, so the common case stays compact.
+# from the one most of your PRs share.
 #SHOW_OWNER=auto
 
-# Set to 0/off/false/no to render without colour, leaving the glyphs to carry
-# the state. `COLOUR` is accepted as well, and `COLOR` wins if both are set.
+# Set to 0/off/false/no to render without colour. `COLOUR` also works, and
+# `COLOR` wins if you set both.
 #COLOR=on
 
-# unicode | nerd. Which set of marks the pane and the sidebar draw. Both sets
-# answer the same questions in the same cells at the same widths — this picks a
-# typeface, not a vocabulary.
+# unicode | nerd. The set of marks the pane and the sidebar draw. Both sets mark
+# the same facts in the same cells.
 #
-# `unicode` is the default and needs no font installed. It is also the reason
-# this setting exists: those marks are geometric shapes and dingbats, and most
-# monospace fonts do not have them. Of the eleven, Monaco — macOS's default —
-# has exactly one, so the other ten are drawn by OS font fallback out of
-# whatever proportional font happens to have them, which is why they can look
-# like they came from different typefaces. They did.
+# `unicode` needs no font installed, but most monospace fonts lack its marks
+# (Monaco has one of the eleven), so OS font fallback draws them from mixed
+# typefaces.
 #
-# `nerd` draws Octicons, GitHub's own icon set, from the Nerd Fonts private-use
-# block. It needs a font that has them:
+# `nerd` draws GitHub's Octicons from the Nerd Fonts private-use block, and
+# gives a review verdict and a build result separate marks. It needs a font
+# that has them:
 #
-#   Ghostty      nothing to do — it embeds Symbols Nerd Font 3.4.0 in the binary
+#   Ghostty      nothing to do: it embeds Symbols Nerd Font 3.4.0
 #   iTerm2       brew install --cask font-symbols-only-nerd-font, then
 #                Profiles > Text > "Use a different font for non-ASCII text"
 #   elsewhere    any patched Nerd Font as the terminal font
 #
-# A missing glyph is a blank cell, not an error, so check the pane after
-# switching. `nerd` also says one thing `unicode` cannot: a review verdict and a
-# build result get separate marks, where `unicode` spends `✓` on both a passing
-# build and an approval.
-#
-# Write the name in lower case. An unrecognised name — `Nerd`, `octicons`, a
-# typo — is ignored and the default stands, because painting blank cells over a
-# misspelling is worse than ignoring it.
-#
-# The pane reads this file once, at startup, and reloading the plugin does not
-# restart the pane process. Close the widget after changing it:
-# `herdr plugin pane close <pane-id>`.
+# A missing glyph is a blank cell, so check the pane after you switch. Write
+# the name in lower case: the plugin ignores an unknown name and keeps the
+# default.
 #GLYPHS=unicode
 
-# Minimum seconds between sidebar-token lookups for a single pane. Focus events
-# fire far more often than a PR's state changes, and each lookup is two `gh`
-# subprocesses.
+# Minimum seconds between sidebar-token lookups for one pane. Each lookup runs
+# two `gh` subprocesses.
 #TOKEN_THROTTLE_SECONDS=30

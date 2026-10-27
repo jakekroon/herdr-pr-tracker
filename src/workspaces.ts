@@ -1,5 +1,4 @@
-// Which PRs you already have a Herdr workspace open on. This is the one thing
-// the widget knows that GitHub's own PR list cannot tell you.
+// Which PRs you already have a Herdr workspace open on.
 
 import type { PrRow } from "./model.ts";
 
@@ -12,10 +11,8 @@ export interface OpenBranch {
 /**
  * Mark rows whose branch is checked out in an open Herdr workspace.
  *
- * Matching is on (repo, exact branch). Herdr's workspace *label* is a slug of
- * the branch — `TICKET-101-4-permissions` becomes `ticket-101` — and that
- * transform is lossy, so matching on labels would both miss and mismatch.
- * The branch is read from git instead; see collectOpenBranches.
+ * Match on (repo, exact branch) from git. The workspace label is a lossy slug
+ * of the branch: `TICKET-101-4-permissions` becomes `ticket-101`.
  */
 export function linkRows(rows: PrRow[], open: OpenBranch[]): PrRow[] {
   const key = (repo: string, branch: string) => `${repo} ${branch}`;
@@ -44,12 +41,8 @@ interface HerdrWorkspace {
 }
 
 /**
- * Resolve every open Herdr workspace to (repo, branch).
- *
- * One `git worktree list` per distinct repo root rather than one `rev-parse`
- * per workspace: the porcelain listing already carries the branch for every
- * worktree of that repo, so nine workspaces across three repos cost three
- * calls instead of nine.
+ * Resolve every open Herdr workspace to (repo, branch), with one
+ * `git worktree list` per repo root instead of one call per workspace.
  */
 export async function collectOpenBranches(
   workspaces: HerdrWorkspace[],
@@ -78,8 +71,7 @@ export async function collectOpenBranches(
     const wt = w.worktree;
     if (!wt?.checkout_path || !wt.repo_name) continue;
     const branch = branchByPath.get(wt.checkout_path);
-    // A detached HEAD has no branch line in the porcelain output, so it simply
-    // never matches a PR — which is correct, not a gap.
+    // A detached HEAD has no branch line, so it matches no PR.
     if (!branch) continue;
     out.push({ repo: wt.repo_name, branch, workspaceId: w.workspace_id ?? null });
   }

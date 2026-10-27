@@ -1,14 +1,13 @@
-// The only module that talks to Herdr. Every call is best-effort: this is a
-// widget, and a widget that crashes the pane because a socket call blipped is
-// worse than one that draws a slightly stale frame.
+// The only module that talks to Herdr. Every call is best-effort: a failed call
+// returns null instead of crashing the pane.
 
 const HERDR = process.env.HERDR_BIN_PATH ?? "herdr";
 
-/** The plugin id Herdr launched us as, or the manifest's id for a hand-run. */
+/** Falls back to the manifest's id for a hand-run. */
 export const PLUGIN_ID = process.env.HERDR_PLUGIN_ID ?? "herdr-pr-tracker";
 
-/** Metadata source id. Herdr scopes tokens to a source so two plugins writing
- * the same token name cannot silently overwrite each other. */
+/** Herdr scopes tokens to a source, so two plugins cannot overwrite each
+ * other's token of the same name. */
 export const METADATA_SOURCE = `plugin:${PLUGIN_ID}`;
 
 async function call(args: string[]): Promise<unknown | null> {
@@ -35,8 +34,7 @@ export interface PaneInfo {
   cwd?: string;
   foreground_cwd?: string;
   focused?: boolean;
-  /** Herdr's label for the pane. For a plugin pane this is the manifest's
-   * `[[panes]].title`, which is how `adoptWidget` recognises the widget. */
+  /** For a plugin pane, the manifest's `[[panes]].title`. */
   label?: string;
   agent?: string;
   scroll?: { viewport_rows?: number };
@@ -75,11 +73,8 @@ export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
 }
 
 /**
- * Write a sidebar token for a pane.
- *
- * `--ttl-ms` is deliberately not used: a token that expires leaves the sidebar
- * blank between refreshes, which reads as "this branch has no PR" rather than
- * "nobody has looked recently".
+ * No `--ttl-ms`: an expired token leaves the sidebar blank, which reads as
+ * "this branch has no PR".
  */
 export async function setToken(paneId: string, name: string, value: string): Promise<void> {
   await call([
@@ -90,14 +85,10 @@ export async function setToken(paneId: string, name: string, value: string): Pro
 }
 
 /**
- * Set the pane's display title — the name Herdr paints on the pane header.
+ * Set the title Herdr paints on the pane header.
  *
- * Deliberately `report-metadata --title` rather than `pane rename`. Rename
- * rewrites the pane's `label`, and `label` is the discriminator `adoptWidget`
- * matches the widget on: a title that changed with the view would make the
- * widget unrecognisable in one of them, and the only symptom is orphan panes
- * quietly accumulating. The metadata title is display-only and leaves `label`
- * alone — probed: `pane list` reports the two independently.
+ * Use `report-metadata --title`, never `pane rename`: rename rewrites `label`,
+ * which `adoptWidget` matches the widget on.
  */
 export async function setPaneTitle(paneId: string, title: string): Promise<void> {
   await call([
@@ -116,17 +107,12 @@ export async function clearToken(paneId: string, name: string): Promise<void> {
 }
 
 /**
- * Move the widget pane under a target pane, returning the id it now wears.
+ * Move a pane and return the id it now has. A cross-tab move renames the pane,
+ * and the new id is only in the reply.
  *
- * Relocating keeps the renderer process alive — the list stays on screen through
- * the move instead of blanking and refetching — but **a cross-tab move renames
- * the pane**, and the new id is only in the reply
- * (`move_result.pane.pane_id`). Reading it is what stops the caller having to
- * guess which pane the widget became.
- *
- * `ratio` is the share the *target* keeps, so callers pass `moveRatio(desired)`.
- * `--no-focus` matters: the widget is a widget, and a relocation that steals
- * focus both interrupts the user and emits the focus events that re-run follow.
+ * `ratio` is the share the target keeps, so callers pass `moveRatio(desired)`.
+ * `--no-focus` stops the move from interrupting the user and from emitting
+ * focus events that re-run follow.
  */
 export async function movePane(
   paneId: string,
@@ -156,10 +142,8 @@ export async function openPluginPane(
   if (target.targetPane) args.push("--target-pane", target.targetPane);
   if (target.direction) args.push("--direction", target.direction);
   const r = result(await call(args));
-  // The id is nested two deep: {plugin_pane: {plugin_id, entrypoint, pane: {
-  // pane_id, ...}}}. Reading `plugin_pane.pane_id` yields undefined, which
-  // looks exactly like a failed open while the pane is in fact on screen —
-  // which orphans it, because nothing records its id.
+  // The reply is {plugin_pane: {..., pane: {pane_id}}}. `plugin_pane.pane_id`
+  // is undefined, which reads as a failed open and orphans the pane.
   const wrapper = r?.plugin_pane as { pane?: { pane_id?: string } } | undefined;
   return wrapper?.pane?.pane_id ?? null;
 }
@@ -169,14 +153,8 @@ export async function closePluginPane(paneId: string): Promise<void> {
 }
 
 /**
- * Widen or narrow the widget's split.
- *
- * `plugin pane open` takes no `--ratio`, and there is **no `herdr layout` CLI
- * subcommand** — the socket API has `layout.set_split_ratio` but the binary
- * exposes no command for it. `pane resize` is the only CLI route, and it moves
- * a split by a relative amount rather than setting an absolute ratio, so the
- * widget aims for its width by moving the edge once on open and then leaves it
- * alone. Best-effort: an unsized pane is still a usable pane.
+ * Move a pane's split by a relative amount. The CLI has no command to set an
+ * absolute ratio, so this is the only route to a width.
  */
 export async function resizePane(
   paneId: string,
@@ -194,25 +172,15 @@ export async function resizePane(
 /**
  * Make Herdr apply the current layout to the ptys in a pane's tab.
  *
- * Herdr sizes a tab's ptys when it shows the tab. The widget arrives later, so
- * the pane beside it keeps its widget-less size until the next resize. Probed on
- * 0.9.1: an agent pane's pty stayed at 56x179 inside a 54x109 rect, and Herdr
- * showed only the top-left of what the agent drew. A zero-amount resize replies
- * `changed: false` and moves no split, yet it resynced the pty on 4 of 4
- * trials. The width machinery sees no change.
+ * Herdr sizes a tab's ptys when it shows the tab, so the pane beside a newly
+ * arrived widget keeps its old size and Herdr clips what it draws. A
+ * zero-amount resize moves no split but resyncs the ptys.
  */
 export async function resyncPane(paneId: string): Promise<void> {
   await resizePane(paneId, "left", 0);
 }
 
-/**
- * Converge on having a widget on screen.
- *
- * `follow` is the single place that knows where the widget belongs and is
- * idempotent — it opens one if there is none and early-exits if there is — so
- * every entrypoint that owes the user a visible pane goes through here rather
- * than reimplementing the spawn.
- */
+/** Run `follow`, which opens the widget if there is none and is idempotent. */
 export async function openWidget(): Promise<number> {
   const root = process.env.HERDR_PLUGIN_ROOT ?? ".";
   const p = Bun.spawn(["bun", `${root}/bin/follow.ts`], {

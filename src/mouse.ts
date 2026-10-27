@@ -1,13 +1,9 @@
-// SGR mouse reports in, click events out. Pure, and its own module for the
-// reason dock.ts is: the pane entrypoint runs a poll loop on import, so logic
-// that lives there is logic no test can reach.
-//
-// Only the SGR encoding (`1006`) is parsed. The legacy X10 encoding caps
-// coordinates at column 223, and this pane can sit in a tab wider than that.
+// SGR (`1006`) mouse reports in, click events out. The legacy encoding caps a
+// coordinate at column 223, and the pane can sit in a wider tab.
 
 /** One button transition. Coordinates are 1-based, as the wire reports them. */
 export interface MouseEvent {
-  /** 0 left, 1 middle, 2 right. Wheel and motion are dropped before this. */
+  /** 0 left, 1 middle, 2 right. */
   button: number;
   shift: boolean;
   alt: boolean;
@@ -19,18 +15,12 @@ export interface MouseEvent {
 
 // ESC [ < b ; x ; y (M press | m release)
 const REPORT = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;
-/** The longest prefix that could still become a report. Anything shorter than a
- * complete report is held over rather than parsed, because a click can arrive
- * split across two reads. */
+/** A click can arrive split across two reads, so a partial report is held over. */
 const PARTIAL = /\x1b(\[<?[0-9;]*)?$/;
 
 /**
- * Decode every complete report in `buf`, and hand back whatever trailing bytes
- * might still be the start of one.
- *
- * Motion (bit 5) and wheel (bit 6) reports are dropped here rather than by the
- * caller: they are the high-frequency ones, and a widget has nothing to do with
- * either.
+ * Decode every complete report in `buf`, and return the trailing bytes that
+ * could still start one. Motion and wheel reports are dropped.
  */
 export function parseMouse(buf: string): { events: MouseEvent[]; rest: string } {
   const events: MouseEvent[] = [];
@@ -39,7 +29,7 @@ export function parseMouse(buf: string): { events: MouseEvent[]; rest: string } 
   for (let m = REPORT.exec(buf); m; m = REPORT.exec(buf)) {
     end = m.index + m[0].length;
     const b = Number(m[1]);
-    // Bit 5 is motion, bit 6 is the wheel; neither is a click.
+    // Bit 5 is motion, bit 6 is the wheel.
     if ((b & 32) !== 0 || (b & 64) !== 0) continue;
     events.push({
       button: b & 3,
@@ -52,7 +42,6 @@ export function parseMouse(buf: string): { events: MouseEvent[]; rest: string } 
     });
   }
   const tail = buf.slice(end);
-  // Keep only a plausible partial report. Anything else is input the widget has
-  // no use for, and holding it would grow the buffer without bound.
+  // Hold only a plausible partial report, or the buffer grows without bound.
   return { events, rest: PARTIAL.exec(tail)?.[0] ?? "" };
 }

@@ -81,9 +81,7 @@ describe("signals and precedence", () => {
   });
 
   test("a conflict leads the authored order, over a human's ask", () => {
-    // The decision this branch turns on: a conflict is resolved before
-    // anything else about the pull request matters, so it outranks the signal
-    // that led the order until now.
+    // A conflict must be resolved before anything else matters.
     const row = byNumber(121);
     expect(row.conflict).toBe(true);
     expect(signalsFor(row)).toEqual([
@@ -110,9 +108,8 @@ describe("signals and precedence", () => {
     ["MERGEABLE", 123],
     ["absent from the response", 112],
   ])("%s is not a conflict", (_label, number) => {
-    // UNKNOWN is no news. It must never render as a conflict, and equally
-    // never as a confirmed mergeable: the widget does not claim a branch will
-    // merge on the strength of GitHub not having looked yet.
+    // GitHub computes `mergeable` lazily, so UNKNOWN is neither a conflict nor a
+    // confirmed merge.
     const row = byNumber(number as number);
     expect(row.conflict).toBe(false);
     expect(signalsFor(row)).not.toContain("conflict");
@@ -135,8 +132,7 @@ describe("parseSearch", () => {
   test("drafts keep their date position rather than sinking", () => {
     const rows = parseSearch(live).rows;
     const drafts = rows.filter((r) => r.isDraft).map((r) => rows.indexOf(r));
-    // In this fixture the drafts are the newest PRs, so they land last by
-    // date. The assertion that matters is that nothing reordered them.
+    // In this fixture the drafts are the newest PRs.
     expect(drafts).toEqual(
       rows
         .map((r, i) => [r, i] as const)
@@ -160,9 +156,7 @@ describe("parseSearch", () => {
     expect(byNumber(102).unresolvedCapped).toBe(false);
   });
 
-  // GitHub populates reviewDecision only where branch protection requires a
-  // review, so on an unprotected repository these are the *only* thing that
-  // distinguishes an approved pull request from an unreviewed one.
+  // GitHub sets reviewDecision only where branch protection requires a review.
   describe("a review state GitHub declines to decide", () => {
     test("an approval with no branch protection is still approved", () => {
       const row = byNumber(114);

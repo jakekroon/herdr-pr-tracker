@@ -1,9 +1,5 @@
-// The manifest is the plugin's contract with Herdr: a typo in a command path
-// or an action id fails at runtime, in a hook, where nobody is watching.
-//
-// A `.test.ts` file, deliberately: `bun test` only discovers that suffix, so as
-// a plain script this check ran nowhere the README told anyone to look and the
-// packaging bugs it exists to catch would have shipped.
+// A typo in a command path or action id fails at runtime, inside a hook.
+// Keep the `.test.ts` suffix: `bun test` discovers nothing else.
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { VIEWS, viewUrl } from "../src/view.ts";
@@ -21,11 +17,8 @@ const manifest = Bun.TOML.parse(await Bun.file("herdr-plugin.toml").text()) as {
 const problems: string[] = [];
 if (manifest.id !== "herdr-pr-tracker") problems.push(`unexpected id ${manifest.id}`);
 
-// The version is written twice and Herdr only ever reads one of them: `plugin
-// list` and the install preview both report the manifest's. A bumped
-// `package.json` with a stale manifest therefore ships a release that *names
-// itself the previous version* on every machine that installs it, and nothing
-// in the plugin would say otherwise.
+// Herdr reports the manifest's version, so a stale manifest ships a release
+// that names itself the previous version.
 const pkgVersion = (JSON.parse(await Bun.file("package.json").text()) as { version?: string })
   .version;
 if (manifest.version !== pkgVersion) {
@@ -46,7 +39,6 @@ for (const cmd of commands) {
   if (!script || !existsSync(script)) problems.push(`missing script: ${script}`);
 }
 
-// Every pane entrypoint referenced from code must exist in the manifest.
 const paneIds = new Set((manifest.panes ?? []).map((p) => p.id));
 const follow = await Bun.file("bin/follow.ts").text();
 const entrypoint = follow.match(/ENTRYPOINT = "([^"]+)"/)?.[1];
@@ -54,12 +46,8 @@ if (!entrypoint || !paneIds.has(entrypoint)) {
   problems.push(`follow opens entrypoint "${entrypoint}", which the manifest does not declare`);
 }
 
-// Adoption recognises the widget by the label Herdr derives from the pane's
-// manifest `title`. Renaming the title without renaming WIDGET_LABEL would stop
-// the widget being recognised, and the only symptom is a slow leak of orphan
-// panes that nothing ever closes. The pane's *display title* changes with the
-// view and is set through `report-metadata`, which leaves `label` alone — that
-// is why this check is still about one constant name.
+// Herdr derives the pane label from the manifest `title`, and adoption matches
+// on it. A mismatch with WIDGET_LABEL leaks orphan panes with no other symptom.
 const widgetLabel = (await Bun.file("src/dock.ts").text())
   .match(/WIDGET_LABEL = "([^"]+)"/)?.[1];
 const declaredTitle = (manifest.panes ?? []).find((p) => p.id === entrypoint)?.title;
@@ -69,9 +57,6 @@ if (!widgetLabel || widgetLabel !== declaredTitle) {
   );
 }
 
-// One action changes the view, and it takes no argument: the toggle reads the
-// current view and writes the other. An argument here would be a view name, and
-// a mistyped one is a packaging bug nothing reports at runtime.
 const viewActions = (manifest.actions ?? []).filter((a) =>
   (a.command ?? [])[1] === "bin/view.ts"
 );
@@ -85,18 +70,12 @@ for (const a of viewActions) {
   }
 }
 
-// The header's view switcher emits `viewUrl(view)` as an OSC 8 hyperlink, and
-// Herdr only routes the click back to this plugin if a link handler's pattern
-// matches it exactly. Nothing at runtime reports a miss: an unmatched URL falls
-// through to the browser opener, so a drifted URL is a control that silently
-// stops working. The pattern is therefore checked against the same function the
-// renderer calls, and the action it fires against the one action that switches.
+// Herdr routes a click back to the plugin only if a link handler's pattern
+// matches `viewUrl(view)`. A miss falls through to the browser with no error.
 const viewActionIds = new Set(viewActions.map((a) => a.id));
 for (const view of VIEWS) {
   const url = viewUrl(view);
-  // `pattern` is a Rust regex, so it is tested by *matching*, not by comparing
-  // strings: a literal that looks right and a regex that matches are different
-  // claims, and only the second is what Herdr will do.
+  // `pattern` is a Rust regex, so match it against the URL.
   const handler = (manifest.link_handlers ?? []).find((h) => {
     try {
       return h.pattern != null && new RegExp(h.pattern).test(url);
@@ -109,9 +88,7 @@ for (const view of VIEWS) {
     problems.push(`no link handler matches the switcher URL ${url}`);
     continue;
   }
-  // Both URLs fire the same toggle: whichever list was ctrl-clicked is by
-  // construction the view you are not in, so "the other one" is the right move
-  // from either.
+  // Both URLs fire the toggle: a clicked list is always the other view.
   if (!viewActionIds.has(handler.action)) {
     problems.push(
       `link handler ${handler.id} matches ${url} but fires "${handler.action}", which does not change the view`,
@@ -119,15 +96,11 @@ for (const view of VIEWS) {
   }
 }
 
-// Reported as the whole list rather than one failure at a time: a packaging
-// bug is usually a rename that broke several claims at once, and seeing them
-// together is what says which rename it was.
 test("the manifest matches the code it points at", () => {
   expect(problems).toEqual([]);
 });
 
-// A manifest that parsed but declared nothing would satisfy every check above
-// by vacuity, so the counts are asserted rather than printed.
+// An empty manifest would pass every check above.
 test("the manifest declares the commands and handlers the plugin needs", () => {
   expect(commands.length).toBeGreaterThan(0);
   expect(commands.every((c) => c.length >= 2)).toBe(true);

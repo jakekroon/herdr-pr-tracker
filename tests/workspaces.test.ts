@@ -29,10 +29,8 @@ describe("parseWorktrees", () => {
   });
 
   test("keeps the full branch name, which the workspace label loses", () => {
-    // Herdr labels that worktree `ticket-101`, which is a lossy slug of
-    // `TICKET-101-4-permissions`: lowercased, and cut short of the part that
-    // tells the two TICKET-101 branches apart. Matching on labels would
-    // mismatch.
+    // Herdr labels this worktree `ticket-101`, a lossy slug that cannot tell the
+    // two TICKET-101 branches apart.
     const branch = parseWorktrees(PORCELAIN)
       .get("/Users/j/.herdr/worktrees/web-app/ticket-101")!;
     expect(branch).not.toBe("ticket-101");

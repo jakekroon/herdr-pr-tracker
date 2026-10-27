@@ -5,8 +5,7 @@ min_herdr_version = "0.8.0"
 description = "Every open pull request you have authored, docked and colour-coded by what needs you."
 platforms = ["macos", "linux"]
 
-# Commands are run directly, not through a shell, so bun is invoked explicitly
-# rather than relying on a shebang plus the execute bit.
+# Herdr runs commands without a shell, so each command names `bun`.
 
 [[panes]]
 id = "prs"
@@ -19,8 +18,8 @@ description = "Open PRs you authored, with status"
 [[startup]]
 command = ["bun", "bin/follow.ts"]
 
-# The widget follows you: Herdr has no always-on-top surface, so these hooks
-# relocate the single widget pane into whichever tab you enter.
+# Herdr has no always-on-top surface, so these hooks move the widget into the
+# tab you enter.
 [[events]]
 on = "tab.focused"
 command = ["bun", "bin/follow.ts"]
@@ -29,12 +28,8 @@ command = ["bun", "bin/follow.ts"]
 on = "workspace.focused"
 command = ["bun", "bin/follow.ts"]
 
-# The sidebar `$pr` token for the focused pane's branch. This is the
-# responsibility inherited from the gh-pr plugin this one replaces; without it,
-# `$pr` in the user's sidebar row config goes blank.
-#
-# Deliberately not hooked to pane.output_changed, which fires on every output
-# burst and would be a hook storm; bin/token.ts throttles per pane on top.
+# The sidebar `$pr` token for the focused pane's branch. Do not hook
+# pane.output_changed: it fires on every output burst.
 [[events]]
 on = "pane.focused"
 command = ["bun", "bin/token.ts"]
@@ -61,15 +56,8 @@ description = "Show or hide the PR list widget"
 contexts = ["global"]
 command = ["bun", "bin/toggle.ts"]
 
-# The view action. One toggle rather than two idempotent "show me X" actions,
-# because the pane header now names the view you are in ("My PRs" / "Awaiting
-# Review", set with `pane report-metadata --title`) — so a control that promises
-# a destination would be repeating a fact already on screen, and two controls
-# would be two places for it to drift. Two views means "the other one" is
-# unambiguous.
-#
-# It writes the preference and lets the pane process pick it up: the pane owns
-# the poll loop, and two processes fetching would race.
+# Writes the view marker for the pane process to pick up. The pane owns the
+# poll loop, so a second fetching process would race it.
 [[actions]]
 id = "view-toggle"
 title = "Toggle PR view"
@@ -77,22 +65,12 @@ description = "Switch between the PRs you opened and the ones waiting on your re
 contexts = ["global"]
 command = ["bun", "bin/view.ts"]
 
-# The header's view switcher: the dim control in the pane's top line is an
-# OSC 8 hyperlink. The pane claims the mouse and acts on a plain click itself,
-# so these handlers are the *other* route — Herdr sends a ctrl-click on a
-# terminal URL to the first matching handler, which still works in a terminal
-# that delivers one (macOS claims ctrl-click as the secondary click, so iTerm2
-# does not). They cost nothing where that click never arrives.
+# The header's view switcher is an OSC 8 link. The pane handles a plain click
+# itself; these handlers catch a ctrl-click in terminals that deliver one
+# (iTerm2 does not). Either URL is the view you are not in, so both toggle.
 #
-# The URL is GitHub's own list of exactly the pull requests the view being
-# switched *to* shows, so a click that reaches neither route is still not a dead
-# end. Both URLs fire the one toggle action, which is correct rather than lossy:
-# whichever list you ctrl-clicked is by construction the view you are not in.
-#
-# `pattern` is a Rust regular expression, so the dots are escaped and both ends
-# anchored. Anchoring is what keeps the registration honest: a pattern
-# registration is global, and an unanchored one would also claim any longer URL
-# that merely contains this one, in any pane, including inside agent output.
+# `pattern` is a Rust regex. Keep it anchored: a registration is global, and an
+# unanchored one claims longer URLs in every pane.
 [[link_handlers]]
 id = "view-authored-link"
 title = "Toggle PR view"

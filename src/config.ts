@@ -1,16 +1,6 @@
-// Configuration is deliberately small. What a row *means* is not configurable:
-// precedence, colour and sort order are fixed, because a widget whose meaning
-// depends on settings is a widget you have to remember the settings of before
-// you can read it.
-//
-// `GLYPHS` is not an exception to that rule, and is worth saying why. It
-// chooses a typeface for the marks, not a vocabulary: both sets answer the same
-// questions in the same cells at the same widths, and a reader who knows what a
-// row means in one knows what it means in the other. It exists because the
-// marks are only drawable if the terminal's font has them — of the eleven,
-// Monaco, macOS's default, has exactly one — so the set is a fact about the
-// machine rather than a preference about the widget. `COLOR` is off the same
-// shelf: it turns escapes off for a surface that cannot show them.
+// What a row means is fixed: precedence, colour and sort order are not
+// settings. `GLYPHS` and `COLOR` only adapt the drawing to what the terminal
+// can show.
 
 import { DEFAULT_GLYPHS, type GlyphSet, isGlyphSet } from "./glyphs.ts";
 import { join } from "node:path";
@@ -23,25 +13,21 @@ export interface Config {
   /** "auto" shows the owner only when a PR's owner is not the common one. */
   showOwner: "auto" | "always" | "never";
   colour: boolean;
-  /** Which set of marks the pane and the sidebar draw. */
   glyphs: GlyphSet;
   /** Minimum seconds between per-pane sidebar-token lookups. */
   tokenThrottleSeconds: number;
-  /** Repositories and owners whose pull requests are never fetched, in either
-   * view. */
+  /** Repositories and owners excluded from both views. */
   ignore: IgnoreEntry[];
-  /** Ignore entries the parser refused, verbatim. Carried on the config rather
-   * than warned about here so the pure layer stays pure and only the pane —
-   * not the sidebar token, which shares this loader — does the complaining. */
+  /** Ignore entries the parser refused, verbatim. The pane reports them; the
+   * sidebar token shares this loader and stays silent. */
   ignoreDropped: string[];
-  /** Authors whose pull requests are never fetched, in either view. Its own
-   * field rather than more of `ignore`, so a config file that sets only one of
-   * the two keys does not reset the other when `loadConfig` merges files. */
+  /** Authors excluded from both views. A separate field from `ignore`, because
+   * `loadConfig` merges files key by key: a file that sets one key keeps the
+   * other. */
   ignoreAuthors: IgnoreEntry[];
   /** Author entries the parser refused, verbatim. */
   ignoreAuthorsDropped: string[];
-  /** Pull requests with no update in this many days are never fetched, in
-   * either view. `null` is no cutoff. */
+  /** Exclude pull requests idle for more than this many days. `null` is no cutoff. */
   maxIdleDays: number | null;
 }
 
@@ -60,35 +46,17 @@ export const DEFAULTS: Config = {
   maxIdleDays: null,
 };
 
-// A GitHub login: alphanumerics and hyphens, never starting or ending with a
-// hyphen, and at most 39 characters. Deliberately no tighter than that — GitHub
-// also forbids consecutive hyphens, but a login that merely does not exist is
-// already an accepted failure of this feature (it subtracts nothing), so the
-// rule here only has to catch what is *certainly* not a login.
-//
-// A repository name additionally allows dots and underscores, and may begin with
-// one — `.github` is a real repository. `.` and `..` are not names, though.
+// These reject only what is certainly not a login or a repository name. A
+// well-formed name that does not exist subtracts nothing. `.github` is a real
+// repository name; `.` and `..` are not.
 const VALID_OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const VALID_REPO_NAME = /^(?!\.{1,2}$)[A-Za-z0-9._-]+$/;
 
 /**
- * Split `IGNORE_REPOS` into entries, refusing anything ambiguous.
- *
- * Whitespace *and* commas separate, because neither character is legal in an
- * owner or a repository name, so accepting both costs no ambiguity and stops a
- * comma-typing user from ignoring nothing.
- *
- * The slash carries the meaning: `acme/web-app` is one repository, `acme/` is
- * every repository under `acme`, and a bare `web-app` is an **error**. That last
- * one is the point of the syntax rather than pedantry — GitHub answers both
- * `-repo:web-app` and `-user:web-app` by subtracting nothing and reporting no
- * error, so a parser that guessed which was meant would produce a filter that
- * silently does not filter. URLs fail the same test, on the same grounds: one
- * accepted paste-shape invites a queue of them.
- *
- * Duplicates collapse case-insensitively, because GitHub's qualifiers are
- * case-insensitive and two spellings of one repository are one ignore. Refusals
- * collapse the same way, so one mistake is reported once.
+ * `acme/web-app` is one repository and `acme/` is every repository under
+ * `acme`. A bare `web-app` or a URL is refused: GitHub answers a wrong
+ * `-repo:` or `-user:` qualifier by subtracting nothing, with no error.
+ * Duplicates collapse case-insensitively, as GitHub's qualifiers do.
  */
 function parseIgnoreList(
   raw: string,
@@ -148,21 +116,11 @@ function parseList(
   return { entries, dropped };
 }
 
-/** The noun that agrees with the count. Shared by both sentences below rather
- * than derived twice: they say one fact at two lengths, and two copies of the
- * plural rule is two places for them to stop agreeing. */
 function entryNoun(n: number): string {
   return n === 1 ? "entry" : "entries";
 }
 
-/**
- * What to say about ignore entries the parser refused, or null when there is
- * nothing to say.
- *
- * Pure, and here rather than in the pane, for the reason `src/view.ts` gives for
- * living outside `state.ts`: the pane is the I/O layer the tests never exercise,
- * so a sentence composed there is a sentence that can never go red.
- */
+/** The stderr warning for refused ignore entries, or null when there are none. */
 export function ignoreWarning(
   dropped: readonly string[],
   key: IgnoreKey = "IGNORE_REPOS",
@@ -172,7 +130,6 @@ export function ignoreWarning(
     `${entryNoun(dropped.length)} (${dropped.join(", ")}) — ${HINT[key]}`;
 }
 
-/** The config keys that carry an ignore list. */
 export type IgnoreKey = "IGNORE_REPOS" | "IGNORE_AUTHORS";
 
 const HINT: Record<IgnoreKey, string> = {
@@ -181,15 +138,7 @@ const HINT: Record<IgnoreKey, string> = {
   IGNORE_AUTHORS: `each must be a login, "name[bot]", or "app/name"`,
 };
 
-/**
- * The same refusal, short enough for the pane.
- *
- * Two sentences for one fact, deliberately: `ignoreWarning` names the offending
- * entries because stderr has room for them, and the pane has tens of columns —
- * so the line that has to fit there says only how many, and leaves the reader to
- * the config file for which. Both count the same list, so they cannot disagree
- * about whether there is a problem.
- */
+/** The same warning, short enough for the pane: a count, without the entries. */
 export function ignoreNotice(
   dropped: readonly string[],
   key: IgnoreKey = "IGNORE_REPOS",
@@ -220,8 +169,7 @@ export function configWarnings(
   ].filter((w): w is string => w != null);
 }
 
-/** Parse `KEY=value` lines. Shell-shaped so the file is interchangeable with
- * the `config`/`config.example` convention the sibling plugin established. */
+/** Parse shell-style `KEY=value` lines. */
 export function parseConfig(text: string): Partial<Config> {
   const out: Record<string, string> = {};
   for (const raw of text.split("\n")) {
@@ -257,9 +205,7 @@ export function parseConfig(text: string): Partial<Config> {
   if (out.SHOW_OWNER === "always" || out.SHOW_OWNER === "never" || out.SHOW_OWNER === "auto") {
     cfg.showOwner = out.SHOW_OWNER;
   }
-  // Strict, and silent about a refusal: an unknown name leaves the key out of
-  // the partial entirely, so the default survives. Drawing blank cells because
-  // a name was misspelled is the one outcome worth ruling out.
+  // An unknown name keeps the default, so a typo cannot draw blank cells.
   if (out.GLYPHS != null && isGlyphSet(out.GLYPHS)) cfg.glyphs = out.GLYPHS;
   if (out.IGNORE_REPOS != null) {
     const { entries, dropped } = parseIgnoreList(out.IGNORE_REPOS);
@@ -278,11 +224,7 @@ export function parseConfig(text: string): Partial<Config> {
   return cfg;
 }
 
-/**
- * Read the repo-root `config` first, then the plugin config dir — the second
- * wins, so a linked development checkout can be overridden by the installed
- * config without editing the tree.
- */
+/** Read the repo-root `config`, then the plugin config dir. The second wins. */
 export async function loadConfig(pluginRoot: string, configDir?: string): Promise<Config> {
   let cfg: Config = { ...DEFAULTS };
   for (const dir of [pluginRoot, configDir]) {

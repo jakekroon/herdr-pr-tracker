@@ -1,9 +1,6 @@
 #!/usr/bin/env bun
-// The widget itself: a long-lived process owning one pane.
-//
-// Herdr has no background-poll mechanism for plugins — hooks fire on events
-// and actions fire on demand — so the poll loop lives here, in the pane
-// process, which is the one part of a plugin that is allowed to stay alive.
+// The widget: a long-lived process that owns one pane. Herdr gives plugins no
+// background poll, so the poll loop lives here.
 
 import { dirname, join } from "node:path";
 import { configNotice, configWarnings, loadConfig } from "../src/config.ts";
@@ -32,26 +29,15 @@ const REFRESH_FILE = join(stateDir(), "refresh");
 const ESC = "\x1b";
 const ALT_SCREEN_ON = `${ESC}[?1049h${ESC}[?25l`;
 const ALT_SCREEN_OFF = `${ESC}[0m${ESC}[?1049l${ESC}[?25h`;
-// Button press/release only (`1000`), never `1002`: motion reports arrive on
-// every pixel of every drag across the pane and this widget has nothing to do
-// with a drag. `1006` is the SGR encoding — the legacy one caps a coordinate at
-// column 223, and the pane can sit in a tab wider than that.
+// Press and release only (`1000`). `1002` would report every pixel of a drag.
+// `1006` is the SGR encoding, which has no column-223 cap.
 const MOUSE_ON = `${ESC}[?1000h${ESC}[?1006h`;
 const MOUSE_OFF = `${ESC}[?1006l${ESC}[?1000l`;
 
 const cfg = await loadConfig(PLUGIN_ROOT, process.env.HERDR_PLUGIN_CONFIG_DIR);
-// Written before the alt screen is entered, so in a Herdr pane it is painted and
-// then immediately covered: this is a trail for a pane run directly (`bun
-// bin/pane.ts`) or one that exits early, **not** a message the user will see in
-// passing. README and config.example both say so rather than offering stderr as
-// the place to look — the in-pane count is the half that actually lands.
-//
-// The protection against a malformed entry is that it is dropped rather than
-// sent; being told about it is the lesser half, and this is as far as it goes
-// without spending header columns the list wants.
+// The alt screen covers this line in a Herdr pane. It is for a pane run by hand
+// or one that exits early; the in-pane notice is what the user sees.
 for (const warning of configWarnings(cfg)) console.error(`herdr-pr-tracker: ${warning}`);
-// The half of that the reader will actually see. Short, because the pane is
-// narrow; the stderr line above names the entries.
 const startupNotice = configNotice(cfg);
 // One list, so both views subtract repositories and authors alike.
 const ignore = [...cfg.ignore, ...cfg.ignoreAuthors];
@@ -60,40 +46,26 @@ let rows: PrRow[] = [];
 let omitted = 0;
 let fetchedAt: number | null = null;
 let error: string | null = null;
-// Which pull requests the pane is listing. Persisted, so the pane comes back in
-// the view it was left in; re-read each tick because the toggle action writes
-// it from another process.
+// Re-read each tick, because the toggle action writes it from another process.
 let view: View = await readView();
-// Where the links landed in the frame currently on screen. Rebuilt by every
-// paint, because a click has to be tested against what the user is looking at
-// rather than what the data now says.
+// Rebuilt by every paint: a click is tested against the frame on screen.
 let targets: HitTarget[] = [];
-// When the network was last touched, by any route. Declared up here rather than
-// beside the loop because `refresh` stamps it: a fetch a click asked for counts
-// as the poll for that interval, so the loop does not immediately fetch again.
+// Stamped by `refresh`, so a fetch a click asked for counts as that interval's poll.
 let lastPoll = 0;
 
 // --- terminal ---------------------------------------------------------------
 
-// Deafen the tty. `-isig` is what stops a stray Ctrl-C or Ctrl-Z killing or
-// suspending the widget, and it also neutralises `pane send-keys` aimed here.
-// Never `stty raw`: it drops `opost onlcr` and every line stair-steps.
-//
-// The mouse *is* claimed here — see `src/open.ts` for why that reverses the
-// original design, and `handleClick` for what the pane does with it.
+// `-isig` stops a stray Ctrl-C or Ctrl-Z, and `pane send-keys`, from killing the
+// widget. Never `stty raw`: it drops `opost onlcr` and every line stair-steps.
 function deafen() {
   try {
     Bun.spawnSync(["stty", "-echo", "-icanon", "-isig", "-ixon", "-iexten"], {
       stdin: "inherit",
     });
-  } catch {
-    // A pane without a controllable tty simply stays interactive; the widget
-    // is still readable, which is the part that matters.
-  }
+  } catch {}
 }
 
 function geometry(): { cols: number; rows: number } {
-  // Herdr resizes the pty, so the process's own idea of its size is the truth.
   const cols = process.stdout.columns ?? 44;
   const lines = process.stdout.rows ?? 24;
   return { cols: Math.max(12, cols), rows: Math.max(1, lines) };
@@ -111,34 +83,21 @@ function paint() {
     colour: cfg.colour,
     glyphs: cfg.glyphs,
     view,
-    // `auto` spends the ten columns on an owner prefix only once a second
-    // owner is actually present.
     showOwner: cfg.showOwner === "always" ||
       (cfg.showOwner === "auto" && needsOwner(rows)),
     omitted,
-    // Computed once at startup and unchanging, because the config is read once
-    // at startup: the pane says it on every frame so the reader cannot miss it
-    // by not having been looking when the process began.
     notice: startupNotice,
   });
-  // Derived from the painted frame, so whatever is hyperlinked is clickable and
-  // the two can never disagree.
+  // Derived from the painted frame, so the hit map cannot drift from what is drawn.
   targets = hitTargets(lines);
-  // Home, then clear to end of screen: clearing the whole screen first makes
-  // the pane flicker on every repaint, and a repaint happens every second.
+  // Home, then clear to end: a full clear first flickers on every repaint.
   Bun.write(Bun.stdout, `${ESC}[H${ESC}[J${lines.join("\r\n")}`);
 }
 
 /**
- * Which pane this process is drawing into, as of now.
- *
- * `HERDR_PANE_ID` is the id the process was *launched* with, and a cross-tab
- * move renames the pane without restarting or notifying the renderer — probed:
- * a live widget's env said `w23:p1` while the pane was `w23:pX`. So the env var
- * is only the last resort. The recorded id is checked against a
- * live listing first, and the label is the fallback: it is the same
- * discriminator `adoptWidget` uses, and `follow` keeps exactly one pane wearing
- * it.
+ * A cross-tab move renames the pane without telling this process, so
+ * `HERDR_PANE_ID` holds the launch id and is the last resort. Try the recorded
+ * id against a live listing first, then `WIDGET_LABEL`.
  */
 async function ownPaneId(): Promise<string | null> {
   const panes = await listPanes();
@@ -149,28 +108,16 @@ async function ownPaneId(): Promise<string | null> {
   return mine?.pane_id ?? process.env.HERDR_PANE_ID ?? null;
 }
 
-/**
- * Name the view on the pane header.
- *
- * This is the only place the current view is named outright: the header line
- * inside the pane carries a summary and a control, and columns there are the
- * scarcest thing the widget has. The title costs none of them.
- *
- * Best-effort and never awaited by a paint — a pane that cannot reach Herdr is
- * still a readable list, and a missing title is a cosmetic loss.
- */
+/** Name the view on the pane header. Never awaited by a paint. */
 async function titlePane(v: View): Promise<void> {
   const id = await ownPaneId();
   if (id) await setPaneTitle(id, VIEW_TITLE[v]);
 }
 
 /**
- * Serialised writes of the view marker, with a count of the ones still owed.
- *
- * Two things depend on the ordering. The marker must end up holding the view
- * of the *last* click, so the writes cannot race; and the poll loop reads the
- * marker every tick, so while a click's write is still owed it must not read
- * the superseded value and switch the pane straight back.
+ * Serialised view-marker writes, with a count of those still owed. The marker
+ * must end on the last click's view, and the poll loop must not read it while a
+ * write is owed, or it switches the pane straight back.
  */
 let markerWrites: Promise<void> = Promise.resolve();
 let markerWritesOwed = 0;
@@ -178,23 +125,16 @@ function persistView(v: View) {
   markerWritesOwed += 1;
   markerWrites = markerWrites
     .then(() => writeView(v))
-    .catch(() => {
-      // The pane already shows the view; a marker that could not be written
-      // only costs the preference on the next start.
-    })
+    .catch(() => {})
     .finally(() => {
       markerWritesOwed -= 1;
     });
 }
 
 /**
- * The slow half of a switch: the pane title and the fetch for the new view.
- *
- * Runs *behind* the paint rather than in front of it, and each step re-checks
- * that the view it was queued for is still the one on screen, so a click that
- * lands mid-catch-up supersedes it instead of queueing behind it. Serialised
- * for the same reason the marker writes are: two `titlePane` calls in flight
- * at once can land in either order.
+ * The slow half of a switch: pane title, then fetch. Each step re-checks the
+ * view, so a later click supersedes it. Serialised, because two `titlePane`
+ * calls in flight can land in either order.
  */
 let catchUps: Promise<void> = Promise.resolve();
 function catchUpTo(v: View) {
@@ -210,13 +150,8 @@ function catchUpTo(v: View) {
 }
 
 /**
- * Swap views without waiting for the poll — or for anything else.
- *
- * Only the parts that change what is on screen are awaited: the cached list
- * for the new view, and the paint. The marker write, the pane title and the
- * fetch all run behind it, because each of them is a spawn or a network call
- * and holding the click open across them is what made toggling back and forth
- * feel like a request rather than a button.
+ * Swap views. Only the cached-list read and the paint are awaited; the marker
+ * write, title and fetch run behind them, so a quick second click still lands.
  */
 async function switchTo(next: View) {
   view = next;
@@ -230,15 +165,7 @@ async function switchTo(next: View) {
   catchUpTo(view);
 }
 
-/**
- * A click landed. Everything hyperlinked is a target; the switcher is the one
- * whose URL the pane recognises as its own.
- *
- * The switcher's URL is GitHub's own list of the same pull requests, so the
- * comparison is what separates "switch the pane" from "open the browser" — and
- * the fallback is the browser, which is what Herdr would have done with this
- * click before the pane claimed the mouse.
- */
+/** The switcher's URL changes the view; every other link opens in the browser. */
 async function handleClick(row: number, col: number) {
   const hit = hitAt(targets, row, col);
   if (!hit) return;
@@ -251,31 +178,23 @@ async function handleClick(row: number, col: number) {
 
 // --- data -------------------------------------------------------------------
 
-// A fetch is in flight. The poll loop skips its own turn while one is running,
-// so a click's catch-up and the interval poll cannot both hit GitHub for the
-// same list a moment apart.
+// The poll loop skips its turn while a fetch runs, so a click's catch-up and the
+// interval poll do not fetch the same list a moment apart.
 let fetching = false;
 
 /**
- * Fetch one view's list.
- *
- * Takes the view rather than reading the global, and every write back into the
- * globals is guarded on it still being the view on screen: a fetch started for
- * the view you just left must not repaint its rows under the heading of the
- * one you are now looking at. The snapshot is still written either way — it is
- * keyed by view, and a fresher cache for the other view is only ever useful.
+ * Fetch one view's list. Writes to the globals only if `target` is still on
+ * screen, so a late fetch never paints rows under the other view's heading. The
+ * snapshot is per view, so it is written either way.
  */
 async function refresh(target: View) {
   fetching = true;
   lastPoll = Date.now();
   try {
-    // The inbound view is deliberately not `fetchPrs` with a different query:
-    // it is three searches and a dedup, and its rows carry a reason.
     const list = target === "inbound"
       ? await fetchInbound(cfg.maxPrs, ignore, cfg.maxIdleDays)
       : await fetchPrs(cfg.searchQuery, cfg.maxPrs, ignore, cfg.maxIdleDays);
-    // Workspace linkage is local and cheap, and a failure to read it must not
-    // discard a good PR fetch — so it degrades to "nothing linked".
+    // A workspace read failure must not discard a good PR fetch.
     let linked = list.rows;
     try {
       linked = linkRows(list.rows, await collectOpenBranches(await listWorkspaces()));
@@ -283,9 +202,6 @@ async function refresh(target: View) {
       linked = list.rows;
     }
     const at = Date.now();
-    // The cache is keyed by view, so it is written whether or not this view is
-    // still the one on screen — a fresher list for the view you just left is
-    // exactly what the next switch back wants to paint.
     await writeSnapshot({ fetchedAt: at, rows: linked, omitted: list.omitted }, target);
     if (view !== target) return;
     rows = linked;
@@ -293,9 +209,8 @@ async function refresh(target: View) {
     fetchedAt = at;
     error = null;
   } catch (e) {
-    // Keep the last good list on screen. The header turns red and says why,
-    // and still reports how old the data actually is: showing stale rows as
-    // though they were fresh is the one failure this widget must not have.
+    // Keep the last good list. The header turns red and still shows the data's
+    // real age, so stale rows never pass as fresh.
     if (view === target) error = e instanceof GhError ? e.message : "refresh failed";
   } finally {
     fetching = false;
@@ -305,39 +220,27 @@ async function refresh(target: View) {
 // --- lifecycle --------------------------------------------------------------
 
 function shutdown() {
-  // Release the mouse before the alt screen: a pane that exits still holding
-  // mouse reporting leaves the *terminal* in that mode, and whatever Herdr puts
-  // in this cell next inherits it.
+  // Release the mouse before the alt screen, or the terminal keeps reporting
+  // into whatever Herdr puts in this cell next.
   Bun.write(Bun.stdout, MOUSE_OFF + ALT_SCREEN_OFF);
   process.exit(0);
 }
 
-// SIGINT/SIGTERM still arrive from Herdr closing the pane even with -isig,
-// which only stops the *tty* from generating them.
+// `-isig` stops only the tty from sending these; Herdr still sends them on close.
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 process.on("SIGHUP", shutdown);
-// A throw anywhere — a paint, the loop, a rejected fetch nothing caught — would
-// otherwise take the process out *without* releasing the mouse or the alt
-// screen, and the terminal keeps reporting into whatever Herdr puts in this
-// cell next. The widget is long-lived enough to outlive plugin reloads, so the
-// one exit path that skips `shutdown` is worth closing even though nothing is
-// known to reach it.
+// Any other exit would skip `shutdown` and leave the terminal in mouse mode.
 process.on("uncaughtException", shutdown);
 process.on("unhandledRejection", shutdown);
-// A resize only needs a repaint, which the loop already does every tick.
+// A resize needs only a repaint, which the loop does every tick.
 process.stdout.on("resize", () => paint());
 
 deafen();
-// Read stdin for mouse reports, and discard everything else so anything typed
-// or sent at the pane is dropped rather than echoed into the frame. Job control
-// is off in a non-interactive process, so reading the pane's own tty here never
-// earns a SIGTTIN.
+// Read stdin for mouse reports and drop everything else, so typed input never
+// echoes into the frame.
 let pending = "";
-// One click at a time — but only across the part of a click that touches the
-// screen. `switchTo` no longer awaits the title or the fetch, so this is held
-// for a snapshot read and a paint rather than for a network round trip, and
-// toggling back and forth is limited by how fast the pane can repaint.
+// One click at a time. It holds only for a snapshot read and a paint.
 let busy = false;
 try {
   process.stdin.resume();
@@ -345,9 +248,8 @@ try {
     const { events, rest } = parseMouse(pending + chunk.toString("binary"));
     pending = rest;
     for (const e of events) {
-      // The press, not the release: the release of a drag that started
-      // elsewhere lands here too, and only the press says where the click
-      // began. Left button only — Herdr keeps the right one for its own menu.
+      // The press, because a drag that started elsewhere releases here too.
+      // Left button only: Herdr keeps the right one for its own menu.
       if (!e.press || e.button !== 0 || busy) continue;
       busy = true;
       handleClick(e.row, e.col).finally(() => {
@@ -356,14 +258,10 @@ try {
     }
   });
   process.stdin.on("error", () => {});
-} catch {
-  // No readable stdin is fine; there is then nothing to drain, and the widget
-  // is still a readable list.
-}
+} catch {}
 Bun.write(Bun.stdout, ALT_SCREEN_ON + MOUSE_ON);
 
-// Show the cached list immediately, correctly labelled with its true age, so a
-// restarted widget is never a blank pane for a whole poll interval.
+// Paint the cached list at once, with its true age, so a restart is never blank.
 const cached = await readSnapshot(view);
 if (cached) {
   rows = cached.rows;
@@ -371,16 +269,15 @@ if (cached) {
   fetchedAt = cached.fetchedAt;
 }
 paint();
-// The title is set on start as well as on every change: Herdr reopens the pane
-// under a new id after a plugin reload without running `follow`, and that pane
-// would otherwise wear the manifest's label until the view next changed.
+// A plugin reload reopens the pane under a new id without running `follow`, so
+// the title is set on start too.
 await titlePane(view);
 
 await refresh(view);
 
 while (true) {
-  // The age in the header ticks every second; the network is only touched on
-  // the poll interval, or when the refresh action drops a file for us.
+  // The age ticks every second; the network is touched only on the poll
+  // interval or when the refresh action drops its marker.
   await Bun.sleep(1000);
 
   let forced = false;
@@ -389,33 +286,22 @@ while (true) {
       await Bun.file(REFRESH_FILE).delete();
       forced = true;
     }
-  } catch {
-    // Nothing to do: a missing or unreadable marker just means no request.
-  }
+  } catch {}
 
-  // The toggle action landed. Swap to that view's cached list and repaint before
-  // fetching, so the switch is immediate rather than a pane that keeps showing
-  // the old view until the network answers — and never shows one view's rows
-  // under the other view's heading.
-  //
-  // Skipped while a click's marker write is still owed: the click has already
-  // applied the new view here, and reading the marker before that write lands
-  // would see the superseded value and switch the pane straight back.
+  // The toggle action changed the view. Skip the read while a click's marker
+  // write is owed, or the superseded value switches the pane straight back.
   if (markerWritesOwed === 0) {
     const wanted = await readView();
     if (wanted !== view) {
+      // `switchTo` queues the fetch for the new view.
       await switchTo(wanted);
-      // `switchTo` has already queued the fetch for the new view.
       continue;
     }
   }
 
-  // A click's catch-up may already be fetching; the poll waits a tick rather
-  // than asking GitHub for the same list twice a moment apart.
   if (!fetching && (forced || Date.now() - lastPoll >= cfg.pollSeconds * 1000)) {
     await refresh(view);
   }
 
-  // Repaint every tick regardless, so the relative age stays honest.
   paint();
 }
