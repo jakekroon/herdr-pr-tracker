@@ -27,25 +27,17 @@ describe("dockTarget", () => {
   });
 
   test("breaks a tie on the right edge by height", () => {
-    // The real shape this guards: a full-height pane above a five-row strip,
-    // both flush to the right edge. Docking beside the strip would give the
-    // widget five rows.
     const panes = [pane("tall", 36, 1, 209, 49), pane("strip", 36, 50, 209, 7)];
     expect(dockTarget(panes, null)?.pane_id).toBe("tall");
   });
 
   test("skips a bottom strip that is the rightmost pane outright", () => {
-    // The sibling herdr-motivational-pane docks a seven-row strip along the
-    // bottom of the right-hand column. With the widget itself excluded, that
-    // strip is the rightmost thing in the tab and there is no tie to break —
-    // splitting it turned it into a five-column full-height sliver.
+    // herdr-motivational-pane docks a seven-row strip at the bottom right.
     const panes = [pane("work", 36, 1, 155, 56), pane("strip", 196, 50, 54, 7)];
     expect(dockTarget(panes, "widget")?.pane_id).toBe("work");
   });
 
   test("a tab of nothing but strips still docks somewhere", () => {
-    // Docking badly beats not docking at all: the filter must not be able to
-    // empty the candidate list.
     const panes = [pane("a", 0, 50, 100, 7), pane("b", 100, 50, 80, 7)];
     expect(dockTarget(panes, null)?.pane_id).toBe("b");
   });
@@ -84,8 +76,7 @@ describe("usableRatio", () => {
   });
 
   test("rejects rather than clamps a width no user chose", () => {
-    // A zoomed pane measures as the whole tab, and a missing area width
-    // measures as zero. Clamping either would record it as a preference.
+    // A zoomed pane measures as the whole tab, and a missing area width as zero.
     expect(usableRatio(1)).toBeNull();
     expect(usableRatio(0)).toBeNull();
     expect(usableRatio(0.02)).toBeNull();
@@ -111,22 +102,18 @@ describe("ratioChanged", () => {
   });
 
   test("re-docking the same width into a differently divided tab is not a resize", () => {
-    // 42/209 and 42/210 are the same chosen width landing a fraction of a
-    // column apart; recording that would make the width drift on every hop.
+    // The same width lands a fraction of a column apart in different tabs.
     expect(ratioChanged(usableRatio(42 / 209), usableRatio(42 / 210))).toBe(false);
   });
 
   test("a width the approach cannot reproduce is not remembered", () => {
-    // The finest resize step moves several columns, so a two-column difference
-    // is below what any later dock could land on. Recording it would store a
-    // number that can only be approximated, and the stored value would then
-    // creep a column at a time on every hop.
+    // The finest resize step moves several columns, so no dock can reproduce a
+    // two-column difference.
     expect(ratioChanged(usableRatio(44 / 209), usableRatio(42 / 209))).toBe(false);
   });
 
   test("a dock stopping legitimately short is not mistaken for a drag", () => {
-    // The approach stops inside WIDTH_TOLERANCE, so landing at 0.211 while
-    // aiming for 0.2 is the widget's own arithmetic, not a user choice.
+    // The walk stops inside WIDTH_TOLERANCE.
     expect(ratioChanged(0.211, 0.2)).toBe(false);
   });
 
@@ -152,7 +139,7 @@ describe("adoptWidget", () => {
   });
 
   test("adopts a widget Herdr reopened under a new id", () => {
-    // The reload case: the recorded id is a ghost and this is what is on screen.
+    // After a reload the recorded id is stale.
     expect(adoptWidget([widget("pY", "t1")], "prs", "t1")).toEqual({
       keep: "pY",
       close: [],
@@ -218,8 +205,7 @@ describe("widthStep", () => {
   });
 
   test("never jumps the whole gap, so a non-linear amount cannot overshoot", () => {
-    // A single computed jump is what put the widget at a tenth of the tab after
-    // a workspace change; the step is bounded regardless of how far it is.
+    // `pane resize --amount` is non-linear, so one step stays bounded.
     expect(widthStep(0.5, 0.2)?.amount).toBeLessThanOrEqual(0.1);
     expect(widthStep(0.9, 0.05)?.amount).toBeLessThanOrEqual(0.1);
   });
@@ -269,7 +255,7 @@ describe("lockIsStale", () => {
 
 describe("moveRatio", () => {
   test("hands the target the complement, since that is the share it keeps", () => {
-    // Probed: --ratio 0.8 landed the moved widget at 0.201 of a 209-column tab.
+    // `--ratio` is the share the target pane keeps.
     expect(moveRatio(0.2)).toBe(0.8);
     expect(moveRatio(0.3)).toBe(0.7);
   });
@@ -294,10 +280,7 @@ describe("shouldRecordWidth", () => {
   });
 
   test("does not record the width a placement fell short at", () => {
-    // The measured bug: stored 0.311, the walk could only reach 0.258 because
-    // the tab was shared with another plugin's pane, and the next settled run
-    // wrote 0.258 back as though the user had chosen it. Each hop then took
-    // another bite.
+    // The walk reached 0.258 of a stored 0.311. That shortfall is not a drag.
     expect(shouldRecordWidth(0.258, 0.311, 0.258)).toBe(false);
   });
 
@@ -321,8 +304,7 @@ describe("shouldRecordWidth", () => {
 
 describe("lockIsStale as the in-flight test", () => {
   test("a lock stamped just now means a placement is walking the pane", () => {
-    // What `placementInFlight` leans on: while this is false the settled path
-    // must not record, because the width on screen is mid-walk.
+    // While the lease holds, the width on screen is mid-walk.
     expect(lockIsStale(1_000_000, 1_000_100)).toBe(false);
   });
 

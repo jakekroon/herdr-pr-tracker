@@ -12,8 +12,6 @@ describe("parseView", () => {
   });
 
   test("falls back to the authored view rather than throwing", () => {
-    // A marker written by a future version, or half-written, must not take the
-    // widget down: the authored view is the one the plugin has always had.
     expect(parseView("reviewer")).toBe(DEFAULT_VIEW);
     expect(parseView("")).toBe(DEFAULT_VIEW);
     expect(parseView(null)).toBe(DEFAULT_VIEW);
@@ -24,9 +22,7 @@ describe("parseView", () => {
 
 describe("snapshotFile", () => {
   test("keys the cache by view", () => {
-    // Sharing one file would paint the authored list for a whole fetch after
-    // reopening in the inbound view — the same class of lie as showing stale
-    // rows as fresh.
+    // One shared file would paint the authored list under the inbound view.
     expect(snapshotFile("authored")).toBe("last-authored.json");
     expect(snapshotFile("inbound")).toBe("last-inbound.json");
   });
@@ -39,8 +35,6 @@ describe("snapshotFile", () => {
 
 describe("isView", () => {
   test("accepts only exact view names", () => {
-    // The manifest's action argument goes through this rather than parseView:
-    // a typo there should fail the action, not quietly pick a view.
     expect(isView("inbound")).toBe(true);
     expect(isView("authored")).toBe(true);
     expect(isView(" inbound ")).toBe(false);

@@ -19,22 +19,20 @@ export interface Layout {
   panes: LayoutPane[];
   area?: Rect;
   /** A zoomed tab reports the zoomed pane at full width, so a width measured
-   * while zoomed says nothing about the split the user chose. */
+   * while zoomed says nothing about the user's split. */
   zoomed?: unknown;
 }
 
 const rightEdge = (p: LayoutPane) => p.rect.x + p.rect.width;
 
 /**
- * The pane the widget shares its column with, when the user has split the
- * widget's pane top and bottom, and the share of the column that pane keeps.
+ * The pane stacked above or below the widget in its column, and the share of
+ * the column that pane keeps.
  *
- * Read just before the widget leaves a tab. Once it has left, the partner fills
- * the whole column and `dockTarget` sees an ordinary full-height pane, so the
- * widget came back *beside* it and squeezed it to a sliver. Recording the
- * partner lets the widget go back under it instead. `pane move` can only split
- * `right` or `down`, so a partner above is preferred: it is the one order the
- * move can restore. A partner below still comes back stacked, but on top.
+ * Read this before the widget leaves a tab. After it leaves, the partner fills
+ * the column and `dockTarget` treats it as an ordinary full-height pane.
+ * `pane move` splits only `right` or `down`, so a partner above is preferred:
+ * only that order can be restored.
  */
 export function stackPartner(
   panes: LayoutPane[],
@@ -52,30 +50,17 @@ export function stackPartner(
   return { pane: partner.pane_id, keep: partner.rect.height / (partner.rect.height + w.rect.height) };
 }
 
-/**
- * How short a pane may be, against the tallest in the tab, and still be worth
- * splitting. A pane below this is a strip along an edge, not a column.
- */
+/** A pane shorter than this fraction of the tallest is a strip, not a column. */
 const STRIP_FRACTION = 0.8;
 
 /**
- * The pane to split off: the rightmost full-height pane in the tab, and among
- * equally-right ones the tallest.
+ * The rightmost full-height pane in the tab, and among equally-right ones the
+ * tallest.
  *
- * Splitting the rightmost pane is what puts the widget in the right-hand
- * column. **Short panes are excluded before rightmost is considered**, and that
- * ordering is the whole point — it was originally only a tiebreak between panes
- * with the *same* right edge, which left the ordinary case broken: the sibling
- * `herdr-motivational-pane` docks a seven-row strip along the bottom of the
- * right-hand column, so once the widget itself is excluded that strip is the
- * rightmost thing in the tab outright, with no tie to break. Splitting it
- * turned it into a five-column full-height sliver and put the widget beside it
- * — probed 2026-08-25, on every placement, in both directions depending on
- * which plugin's `follow` ran last.
- *
- * So "tall enough to be a column" is a filter, and rightmost decides only among
- * those. A tab with nothing but strips falls back to all of them rather than
- * returning null: docking badly beats not docking at all.
+ * Height filters before rightmost decides. The sibling `herdr-motivational-pane`
+ * docks a short strip along the bottom right, and splitting that strip turns it
+ * into a sliver. A tab of nothing but strips falls back to all of them:
+ * docking badly beats not docking.
  */
 export function dockTarget(
   panes: LayoutPane[],
@@ -94,24 +79,15 @@ export function dockTarget(
 }
 
 /**
- * One step of the approach to a target width, or null once close enough.
+ * One step towards a target width, or null once close enough.
  *
- * `pane resize --amount` is a **ratio delta**, and — probed here and
- * independently in the sibling `herdr-motivational-pane` — it is **non-linear
- * and layout-dependent**: the same amount moves a different number of columns
- * in a different tab, and at the extremes moves nothing at all. So a single
- * computed jump to the target cannot be trusted, which is how the widget ended
- * up at a tenth of the tab after a workspace change instead of the fifth it had
- * been left at.
+ * `pane resize --amount` is non-linear and layout-dependent: the same amount
+ * moves a different number of columns in a different tab, and at the extremes
+ * nothing. So the caller steps and re-measures instead of jumping. `stalls`
+ * coarsens the step after a resize that moved nothing, because an amount below
+ * the layout's resolution is a silent no-op.
  *
- * The caller therefore steps and re-measures. Steps are coarse while far away
- * and fine near the target, so the last approach cannot overshoot; `stalls`
- * coarsens the step when a resize moved nothing, because an amount under a
- * layout's resolution is a no-op rather than an error.
- *
- * Direction is from the widget's point of view and reads backwards: for a pane
- * on the right, `left` moves the shared edge leftward and so **grows** it,
- * while `right` shrinks it.
+ * For a pane on the right, `left` grows it and `right` shrinks it.
  */
 export const WIDTH_TOLERANCE = 0.02;
 
@@ -130,26 +106,20 @@ export function widthStep(
   return { direction: delta > 0 ? "left" : "right", amount: amount as number };
 }
 
-/** A pane's share of the area that contains it. */
 export function paneRatio(paneWidth: number, areaWidth: number): number {
   if (!Number.isFinite(areaWidth) || areaWidth <= 0) return 0;
   return paneWidth / areaWidth;
 }
 
-/**
- * The width the widget docks at when nothing has been remembered: about a fifth
- * of the tab.
- */
+/** The width when nothing is remembered: about a fifth of the tab. */
 export const DEFAULT_WIDTH_RATIO = 0.2;
 
 /**
- * The band a width ratio has to fall in to be believed.
+ * The band a stored or measured ratio must fall in to be believed.
  *
- * Both a *stored* and a *measured* ratio go through this. Rejecting rather than
- * clamping is the point: a measurement outside the band did not come from a
- * user dragging a split, it came from a layout the widget was not really in
- * (a zoomed pane, an area width Herdr did not report), and recording it would
- * wedge the widget at that width in every tab from then on.
+ * Out-of-band values are rejected, never clamped. They come from a zoomed pane
+ * or a missing area width, and recording one would wedge the widget at that
+ * width in every tab.
  */
 const MIN_RATIO = 0.08;
 const MAX_RATIO = 0.6;
@@ -162,16 +132,11 @@ export function usableRatio(value: unknown): number | null {
 }
 
 /**
- * Whether a freshly measured width is a manual resize worth remembering.
+ * Whether a measured width differs enough from the stored one to remember.
  *
- * The threshold is `WIDTH_TOLERANCE`, the same band the approach stops inside —
- * because **a width that cannot be reproduced is not worth remembering**. The
- * finest usable resize step moves several columns, so recording a
- * two-column difference would store a number the next dock could not land on,
- * and the stored value would then creep by a column on every hop. It also keeps
- * the widget's own arithmetic out of the record: a dock that stops legitimately
- * short of the target must not be read back as the user having chosen that
- * width.
+ * The threshold is `WIDTH_TOLERANCE` because the walk cannot reproduce a
+ * smaller difference. A stored value inside it would creep a column on every
+ * hop.
  */
 export function ratioChanged(
   measured: number | null,
@@ -184,25 +149,12 @@ export function ratioChanged(
 }
 
 /**
- * Whether a freshly measured width should be written back as the preference.
+ * Whether a measured width is a user drag worth recording.
  *
- * `ratioChanged` alone was not enough, and the gap was the case its own comment
- * claims to cover: "a dock that stops legitimately short of the target must not
- * be read back as the user having chosen that width". The epsilon is about one
- * column, so it only ever caught a shortfall of *one column* — a placement that
- * lands eleven columns short sails straight past it and gets recorded. Measured
- * 2026-08-25: a stored 0.311 that the walk could only reach 0.258 of was
- * rewritten to 0.258 by the very next settled run, and each hop would take
- * another bite.
- *
- * So the width a placement actually *achieved* is remembered too, and a
- * measurement that matches it is treated as the widget's own arithmetic coming
- * back rather than a choice. A drag moves the split away from both numbers,
- * which is what makes the two distinguishable at all.
- *
- * A drag that happens to land exactly on the achieved width is not recorded —
- * it is indistinguishable from no drag at all, and it is the width the pane is
- * already wearing, so nothing on screen changes either way.
+ * `placed` is the width the last placement reached. A placement can stop many
+ * columns short of the stored width, and a measurement that matches `placed` is
+ * that shortfall coming back, not a drag. A drag that lands on `placed` exactly
+ * goes unrecorded, which changes nothing on screen.
  */
 export function shouldRecordWidth(
   measured: number | null,
@@ -217,19 +169,14 @@ export function shouldRecordWidth(
 }
 
 /**
- * The label Herdr gives the widget pane, taken from the manifest's
- * `[[panes]].title`, and the discriminator `adoptWidget` matches on.
+ * The label Herdr gives the widget pane from the manifest's `[[panes]].title`.
  *
- * It lives here rather than in `bin/follow.ts` because the pane process needs
- * it too: the widget has to find *itself* in `pane list` to set its title, and
- * `HERDR_PANE_ID` cannot answer that — it is the id the process was launched
- * with, and a cross-tab move renames the pane without telling the process
- * (probed: a live widget's env said `w23:p1` while the pane was `w23:pX`).
- * `tests/manifest.test.ts` holds this and the manifest title in step.
+ * The pane process needs it too, to find itself in `pane list`: a cross-tab
+ * move renames the pane without updating the process's `HERDR_PANE_ID`.
+ * `tests/manifest.test.ts` keeps this in step with the manifest.
  */
 export const WIDGET_LABEL = "prs";
 
-/** What `adoptWidget` needs off a `pane list` entry. */
 export interface WidgetPane {
   pane_id: string;
   label?: string;
@@ -238,27 +185,16 @@ export interface WidgetPane {
 }
 
 /**
- * Which pane to treat as the widget when the recorded id is no good, and which
- * to close.
+ * Which pane to treat as the widget when the recorded id is stale, and which
+ * duplicates to close.
  *
- * The recorded id goes stale without anything telling the plugin: disabling and
- * re-enabling the plugin closes the widget pane and Herdr reopens it under a
- * **new id**, never running `follow`. Trusting the old id then costs more than a
- * blank pane, because `pane move` *reports success* for a plugin pane id that no
- * longer exists — so `follow` believed it had relocated the widget, exited, and
- * left the stale id in place to be moved again on the next hook. Adopting the
- * pane that is actually there is what breaks that loop.
+ * Disabling and re-enabling the plugin reopens the widget under a new id
+ * without running `follow`. `pane move` then reports success for the dead id,
+ * so the recorded id cannot be trusted.
  *
- * The discriminator is `label`, which Herdr sets from the manifest's
- * `[[panes]].title` and reports on `pane list`. It is used rather than `cwd`
- * because a plugin pane's cwd is the plugin root — indistinguishable from an
- * ordinary shell opened in this repo, which adoption must never seize and start
- * relocating. `agent` excludes an agent pane that happens to carry a label.
- *
- * A widget in the focused tab wins, so a pane already in front of the user is
- * kept rather than closed in favour of one in a tab they cannot see. Everything
- * else with the same label is an orphan from a failed placement, and closing it
- * restores the single-widget invariant.
+ * Match on `label`, never `cwd`: a plugin pane's cwd is the plugin root, the
+ * same as a user's shell opened in this repo. A widget in the focused tab wins.
+ * Every other pane with the label is an orphan.
  */
 export function adoptWidget(
   panes: WidgetPane[],
@@ -276,13 +212,11 @@ export function adoptWidget(
 }
 
 /**
- * Whether a placement lock left behind by another run may be taken over.
+ * Whether another run's placement lock may be taken over.
  *
- * A lock file outlives a run that was killed — a pane closed mid-resize, a
- * machine asleep — and a lock nobody will ever release would stop the widget
- * being placed for the rest of the session. So it is a lease, not a mutex.
- * The TTL is far longer than a placement takes, because stealing a live lock
- * reintroduces exactly the concurrent resizing it exists to prevent.
+ * The lock is a lease, so a run killed mid-placement cannot block placement
+ * for the rest of the session. The TTL is far longer than a placement, because
+ * stealing a live lock brings back the concurrent resizing the lock prevents.
  */
 export function lockIsStale(heldSinceMs: number, nowMs: number, ttlMs = 15_000): boolean {
   if (!Number.isFinite(heldSinceMs)) return true;
@@ -293,16 +227,9 @@ export function lockIsStale(heldSinceMs: number, nowMs: number, ttlMs = 15_000):
 /**
  * The `--ratio` to hand `pane move`.
  *
- * **`--ratio` is the share the *target* pane keeps, not the share the moved pane
- * gets.** Probed: moving the widget onto a 209-column tab with `--ratio 0.8`
- * landed the widget at 0.201. The sibling `herdr-motivational-pane` states the
- * same rule for its `--split down` ("a split leaves the ORIGINAL pane holding
- * the ratio, so hand the target the complement").
- *
- * Passing the desired width directly is what made a space change visibly move
- * the widget: it arrived at *four fifths* of the tab and then had to be walked
- * all the way down a step at a time, in full view. With the complement it
- * arrives at its final width and the corrective walk finds nothing to do.
+ * `--ratio` is the share the target pane keeps, so pass the complement of the
+ * widget's width. The widget then arrives at its final width and needs no
+ * visible walk.
  */
 export function moveRatio(desiredRatio: number): number {
   if (!Number.isFinite(desiredRatio)) return 1 - DEFAULT_WIDTH_RATIO;

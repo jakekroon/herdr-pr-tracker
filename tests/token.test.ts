@@ -102,9 +102,7 @@ describe("the sidebar token follows the configured glyph set", () => {
       .toBe(`#21288 ${glyphsFor("nerd").refreshing}`);
   });
 
-  // The invariant CLAUDE.md records: the pane and the sidebar are two surfaces
-  // showing the same facts, so a set that renamed a mark on one of them would
-  // let them disagree about what a glyph means.
+  // The pane and sidebar must agree on what each glyph means.
   test("draws the same build marks the pane does", () => {
     for (const set of ["unicode", "nerd"] as const) {
       for (const ci of ["pass", "fail", "pending"] as const) {

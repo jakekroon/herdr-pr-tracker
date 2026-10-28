@@ -108,16 +108,14 @@ describe("IGNORE_REPOS", () => {
   });
 
   test("splits on whitespace and on commas, so neither typing habit fails quietly", () => {
-    // Neither character is legal in an owner or a repository name, so accepting
-    // both costs no ambiguity.
+    // Neither character is legal in an owner or repository name.
     const both = ignore('"acme/web-app, acme/platform  acme/"');
     expect(both).toHaveLength(3);
     expect(both?.[2]).toEqual({ kind: "owner", owner: "acme" });
   });
 
   test("a bare word is dropped, not guessed at", () => {
-    // `-repo:web-app` and `-user:web-app` are both accepted by GitHub and both
-    // subtract nothing, so a filter that guessed would fail in silence.
+    // GitHub accepts `-repo:web-app` and `-user:web-app` and subtracts nothing.
     expect(ignore("web-app")).toEqual([]);
     expect(dropped("web-app")).toEqual(["web-app"]);
   });
@@ -155,8 +153,7 @@ describe("IGNORE_REPOS", () => {
   });
 
   test("case is preserved but does not create a duplicate", () => {
-    // GitHub's qualifiers are case-insensitive, so two spellings of one
-    // repository are one ignore entry.
+    // GitHub's qualifiers are case-insensitive.
     expect(ignore('"acme/web-app ACME/Web-App"')).toHaveLength(1);
   });
 
@@ -165,8 +162,7 @@ describe("IGNORE_REPOS", () => {
   });
 
   test("an owner cannot start or end with a hyphen", () => {
-    // GitHub logins cannot, so `-repo:-acme/x` is certainly not a repository —
-    // and GitHub would answer it by subtracting nothing and saying nothing.
+    // GitHub logins cannot, and GitHub ignores `-repo:-acme/x` without an error.
     expect(ignore("-acme/web-app")).toEqual([]);
     expect(ignore("acme-/web-app")).toEqual([]);
     expect(dropped("-acme/web-app")).toEqual(["-acme/web-app"]);
@@ -282,8 +278,7 @@ describe("ignoreNotice", () => {
   });
 
   test("is short enough for a narrow pane, and does not list the entries", () => {
-    // The pane has tens of columns, not hundreds. Naming the offending entries
-    // is `ignoreWarning`'s job, where there is room for them.
+    // `ignoreWarning` names the entries. The pane has no room for them.
     const n = ignoreNotice(["web-app", "https://github.com/acme/web-app"])!;
     expect(n.length).toBeLessThanOrEqual(28);
     expect(n).not.toContain("web-app");
@@ -295,8 +290,6 @@ describe("ignoreNotice", () => {
   });
 
   test("agrees with the stderr sentence about the noun", () => {
-    // Both docstrings claim the two cannot disagree about whether there is a
-    // problem. They share one plural rule to make that true of the wording too.
     for (const n of [1, 2, 3]) {
       const list = Array.from({ length: n }, (_, i) => `bad-${i}`);
       const noun = n === 1 ? "entry" : "entries";
@@ -316,9 +309,7 @@ describe("GLYPHS", () => {
     expect(parseConfig("GLYPHS=unicode")).toEqual({ glyphs: "unicode" });
   });
 
-  // The same rule SHOW_OWNER follows: an unrecognised value is left out of the
-  // partial entirely, so the default survives rather than being overwritten
-  // with something the renderer cannot draw.
+  // As with SHOW_OWNER, an unrecognised value leaves the default in place.
   test("refuses a name it does not know rather than guessing", () => {
     for (const bad of ["GLYPHS=octicons", "GLYPHS=Nerd", "GLYPHS=ascii", "GLYPHS="]) {
       expect(parseConfig(bad)).toEqual({});

@@ -9,13 +9,9 @@ import {
 } from "../src/glyphs.ts";
 import { width } from "../src/render.ts";
 
-/** Nerd Fonts places Octicons at f400–f533 (plus two stragglers this set does
- * not use). Ghostty embeds Symbols Nerd Font 3.4.0, and every codepoint below
- * is identical in 3.4.0 and 3.5.1 — checked against both tags — so pinning to
- * the block Ghostty ships costs nothing. */
+/** Nerd Fonts places Octicons at f400–f533. */
 const OCTICONS = { first: 0xf400, last: 0xf533 };
-/** Name and codepoint for every nerd mark, read out of the upstream Nerd Fonts
- * glyph map at both pinned tags. See the file's own `_note` for provenance. */
+/** Upstream Nerd Fonts glyph map at v3.4.0 and v3.5.1. See its `_note`. */
 const OCTICONS_UPSTREAM: Record<string, { octicon: string; codepoint: string }> =
   (await Bun.file("tests/fixtures/octicons.json").json()).marks;
 
@@ -35,19 +31,8 @@ describe("glyph sets", () => {
     for (const other of rest) expect(other).toEqual(first!);
   });
 
-  // Three claims, deliberately separate, because only the first two have
-  // content. `width()` is `[...s].length` after stripping escapes, so asserting
-  // `width(mark) === 1` *and* `[...mark].length === 1` was the same arithmetic
-  // written twice, and neither says anything about a terminal cell — the trap
-  // CLAUDE.md actually records, where a wide glyph surfaces much later as
-  // `renderRow`'s width assertion on only the rows carrying it.
-  //
-  // What can be checked offline is the two properties that make a terminal
-  // spend a second column or none: emoji presentation, and the default-
-  // ignorables (U+FE0E/FE0F, zero-width joiners). A dingbat with an emoji
-  // presentation default — `✅` U+2705, say, or `⚠️` with the selector baked in
-  // — is exactly the mistake this catches, and it is a mistake `width()` is
-  // blind to by design.
+  // `width()` cannot see these: emoji presentation (`✅` U+2705) makes a terminal
+  // spend two columns, and a default-ignorable spends none.
   test("every mark in every set is a single code point", () => {
     for (const [name, g] of sets) {
       for (const [what, mark] of Object.entries(marksOf(g))) {
@@ -67,9 +52,7 @@ describe("glyph sets", () => {
     }
   });
 
-  // Narrower than the two above: that the renderer's own measurement survives
-  // its escape-stripping. A mark that collided with the SGR or OSC 8 patterns
-  // would measure zero and lay every row carrying it out short.
+  // A mark that matched the SGR or OSC 8 patterns would measure zero.
   test("the renderer's own width() sees every mark", () => {
     for (const [name, g] of sets) {
       for (const [what, mark] of Object.entries(marksOf(g))) {
@@ -90,12 +73,8 @@ describe("the nerd set", () => {
     }
   });
 
-  // The block test above passes for any typo *inside* f400–f533, and the
-  // Octicon name beside each codepoint is a comment, which nothing checks.
-  // `tests/fixtures/octicons.json` is the external oracle: the upstream glyph
-  // map read at both the 3.4.0 and 3.5.1 tags. Without it "checked against
-  // both tags" is a claim in prose with nothing to regress against on the next
-  // Nerd Fonts bump — and Octicons were remapped once already, at 3.0.
+  // The block test passes for any typo inside f400–f533. Regenerate the fixture
+  // on a Nerd Fonts bump: Octicons were remapped at 3.0.
   test("every mark is the Octicon its comment names, at both pinned tags", () => {
     const marks = marksOf(nerd);
     expect(Object.keys(marks).sort()).toEqual(Object.keys(OCTICONS_UPSTREAM).sort());
@@ -107,10 +86,8 @@ describe("the nerd set", () => {
     }
   });
 
-  // The reason this set exists as more than a typeface swap: the unicode set
-  // spends `✓` on both a passing build and an approval, and `✗` on both a
-  // failing build and a request for changes, so the cluster cannot say which
-  // of the two is which. Octicons has a circled pair, so it can.
+  // The unicode set uses `✓` and `✗` for both review and CI. Octicons has a
+  // circled pair for review.
   test("separates a review verdict from a build result", () => {
     expect(nerd.ci.pass).not.toBe(nerd.review.APPROVED);
     expect(nerd.ci.fail).not.toBe(nerd.review.CHANGES_REQUESTED);
@@ -142,8 +119,6 @@ describe("the unicode set", () => {
     expect(uni.clear).toBe("✓");
   });
 
-  // Documents the collision the nerd set fixes, so that reversing one without
-  // the other is a failing test rather than a silent divergence.
   test("still spends one glyph on both a build and a review", () => {
     expect(uni.ci.pass).toBe(uni.review.APPROVED);
     expect(uni.ci.fail).toBe(uni.review.CHANGES_REQUESTED);

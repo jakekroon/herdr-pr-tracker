@@ -27,8 +27,7 @@ describe("parseInbound", () => {
   });
 
   test("reviewer outranks involved when a pull request is in both", () => {
-    // #102 is review-requested *and* involved; #104 is reviewed-by and
-    // involved. Either way you were asked, which is the stronger claim.
+    // #102 is review-requested and involved; #104 is reviewed-by and involved.
     expect(by(102).reason).toBe("reviewer");
     expect(by(104).reason).toBe("reviewer");
   });
@@ -42,9 +41,7 @@ describe("parseInbound", () => {
   });
 
   test("orders newest-created first", () => {
-    // The inbound list accumulates — it does not empty by being worked — so the
-    // oldest rows are the ones already reviewed or merely commented on, and
-    // pushing the freshest requests off the bottom is the failure to avoid.
+    // The inbound list never empties by being worked, so the oldest rows matter least.
     expect(list.rows.map((r) => r.number)).toEqual([104, 103, 101, 106, 102, 105]);
   });
 
@@ -71,8 +68,7 @@ describe("inbound precedence", () => {
     expect(row.conflict).toBe(true);
     expect(row.review).toBe("REVIEW_REQUIRED");
     expect(row.reason).toBe("reviewer");
-    // Both signals are still carried — re-ranking hides nothing — but the
-    // conflict is the one that colours the row.
+    // Both signals stay. The conflict colours the row.
     expect(signalsFor(row, "inbound")).toEqual(["conflict", "review-required"]);
     expect(headline(row, "inbound")).toBe("conflict");
   });
@@ -82,8 +78,6 @@ describe("inbound precedence", () => {
   });
 
   test("a conflict leads both orders — not reviewable outranks not reviewed", () => {
-    // Why, in CONTEXT.md and docs/adr/0004 — not restated here, where it would
-    // be the copy that drifts.
     expect(INBOUND_PRECEDENCE[0]).toBe("conflict");
     expect(PRECEDENCE[0]).toBe("conflict");
   });
@@ -97,8 +91,7 @@ describe("inbound precedence", () => {
   });
 
   test("the two orders disagree on a row that carries both kinds of news", () => {
-    // #101: review required with failing checks. As the author the red CI is
-    // yours to fix; as the reviewer it is theirs, and the ask is yours.
+    // #101: review required with failing checks. The author owns the red CI.
     expect(headline(by(101), "authored")).toBe("checks-failed");
     expect(headline(by(101), "inbound")).toBe("review-required");
 

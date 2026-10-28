@@ -1,5 +1,5 @@
-// The only module that talks to GitHub. Everything it returns is plain data,
-// so the model and render layers stay testable without a network or a token.
+// The only module that talks to GitHub. Keep the logic in `model.ts` and
+// `query.ts`, where the tests reach it.
 
 import { parseInbound, parseSearch, type PrList } from "./model.ts";
 import {
@@ -27,8 +27,7 @@ async function run(
     cwd,
     stdout: "pipe",
     stderr: "pipe",
-    // gh reaches for a pager and colours its output when it believes it has a
-    // tty. The pane renderer *is* a tty, so say otherwise explicitly.
+    // The pane is a tty, so gh would otherwise page and colour its output.
     env: { ...process.env, GH_PAGER: "cat", NO_COLOR: "1", CLICOLOR: "0" },
   });
   const [out, err, code] = await Promise.all([
@@ -39,13 +38,7 @@ async function run(
   return { ok: code === 0, out, err };
 }
 
-/**
- * Map gh's stderr onto the short reason the header shows.
- *
- * The header has room for a few words, and "offline" versus "auth failed" is
- * the difference between waiting and going to fix something — so the
- * classification is worth getting right even though the text is tiny.
- */
+/** Map gh's stderr onto the short reason the header shows. */
 export function classify(err: string): GhError {
   const e = err.toLowerCase();
   if (
@@ -66,14 +59,7 @@ export function classify(err: string): GhError {
   return new GhError(first ? first.slice(0, 40) : "gh failed", "other");
 }
 
-/**
- * One GraphQL request, with the error handling both views need.
- *
- * `hasData` decides what counts as a usable answer, which is the only thing
- * that differs between them: the authored view needs its one search, and the
- * inbound view is content with any one of its three — losing a search is a
- * thinner list, not a failed refresh.
- */
+/** `hasData` decides whether a partial answer is usable. */
 async function graphql(
   args: string[],
   hasData: (data: Record<string, unknown>) => boolean,
@@ -88,8 +74,7 @@ async function graphql(
     throw new GhError("bad response", "other");
   }
 
-  // GraphQL reports failures with HTTP 200 and an `errors` array. Partial data
-  // alongside errors is still worth rendering; no data at all is a failure.
+  // GraphQL reports failures with HTTP 200 and an `errors` array, so gh exits 0.
   const errors = (payload as { errors?: Array<{ message?: string }> })?.errors;
   const data = (payload as { data?: Record<string, unknown> })?.data ?? {};
   if (Array.isArray(errors) && errors.length > 0 && !hasData(data)) {
@@ -99,19 +84,8 @@ async function graphql(
 }
 
 /**
- * Fetch every open PR the search matches, in one request.
- *
- * `threads` caps reviewThreads per PR; a PR at the cap reports its unresolved
- * count as a floor rather than a confident number (model.unresolvedCapped).
- *
- * `ignore` is subtracted inside `searchArgs` rather than by the caller, for the
- * same reason the inbound request subtracts it too: applied at the call sites, a
- * view could be added that forgot to, and the symptom would be a setting that
- * works in one view and not the other. It has no default for the same reason — a
- * required parameter makes tsc the enforcer, which is where this repo puts
- * invariants it does not want to rely on a reader noticing. `maxIdleDays` is
- * required for the same reason, and turned into a date here so that `query.ts`
- * never reads the clock.
+ * `ignore` and `maxIdleDays` have no default, so `tsc` fails a caller that
+ * forgets them. `threads` caps `reviewThreads` per PR.
  */
 export async function fetchPrs(
   query: string,
@@ -127,19 +101,8 @@ export async function fetchPrs(
   return parseSearch(payload, threads);
 }
 
-/**
- * Fetch the inbound view: the three searches GitHub has no `OR` for, aliased
- * into one document so it is still a single request.
- *
- * Deliberately not parameterised by a config query. The three are load-bearing
- * for the reviewer/involved distinction, and an override would break what the
- * glyph means with no way for the reader to notice.
- *
- * The ignore list is the one exception, and it is not an exception to that rule
- * so much as outside it: it can only remove rows, and no surviving row's reason
- * changes because another row left. See
- * docs/adr/0005-ignore-list-reaches-both-views.md.
- */
+/** Takes no config query: an override would break the reviewer/involved
+ * labels. The ignore list only removes rows, so it applies here too. */
 export async function fetchInbound(
   maxPrs: number,
   ignore: readonly IgnoreEntry[],
@@ -153,16 +116,12 @@ export async function fetchInbound(
   return parseInbound(payload, threads, maxPrs);
 }
 
-/**
- * The PR for one branch, for the sidebar token. A separate and much cheaper
- * query than the search: it answers "what is the PR in front of me?".
- */
+/** The PR for one branch, for the sidebar token. */
 export async function fetchBranchPr(
   cwd: string,
   branch: string,
 ): Promise<{ number: number; state: string; isDraft: boolean } | null> {
   const r = await run(["pr", "view", branch, "--json", "number,state,isDraft"], cwd);
-  // No PR for this branch is the ordinary case, not an error worth surfacing.
   if (!r.ok) return null;
   try {
     const j = JSON.parse(r.out);
@@ -174,11 +133,9 @@ export async function fetchBranchPr(
   }
 }
 
-/** Check buckets for one branch, reusing gh's own bucketing. */
 export async function fetchBranchChecks(cwd: string, branch: string): Promise<string[]> {
   const r = await run(["pr", "checks", branch, "--json", "bucket"], cwd);
-  // `gh pr checks` exits non-zero whenever a check is failing, so a non-zero
-  // exit with parseable output is still a valid answer.
+  // `gh pr checks` exits non-zero when a check fails, so read the output anyway.
   try {
     const j = JSON.parse(r.out);
     return Array.isArray(j) ? j.map((c: { bucket?: unknown }) => String(c?.bucket ?? "")) : [];

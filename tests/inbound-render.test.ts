@@ -16,7 +16,6 @@ import { groupRows } from "../src/render.ts";
 import { SWITCHER_LABELS, VIEW_TITLE, viewUrl } from "../src/view.ts";
 
 const list = parseInbound(await Bun.file("tests/fixtures/inbound.json").json());
-/** The set the widget draws when nothing is configured. */
 const UNI = glyphsFor("unicode");
 
 const NOW = Date.parse("2026-08-25T09:00:00Z");
@@ -43,8 +42,7 @@ const pr = (n: number): PrRow => {
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "")
   .replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "");
 
-/** The header minus its view switcher, so an assertion about what the summary
- * claims reads the summary and not the control beside it. */
+/** The header minus its view switcher. */
 const summary = (line: string) =>
   plain(line).replace(/ · (toggle view|toggle|⇄)(?= · |$)/, "");
 
@@ -58,8 +56,6 @@ describe("header", () => {
   });
 
   test("names the view before the first fetch too", () => {
-    // A cold start in the inbound view is otherwise the same picture as one in
-    // the authored view.
     expect(summary(header([], opts({ fetchedAt: null })))).toContain("inbound");
     expect(summary(header([], opts({ fetchedAt: null, view: "authored" }))))
       .not.toContain("inbound");
@@ -80,15 +76,12 @@ describe("the view switcher", () => {
   });
 
   test("names the two views on the pane title instead", () => {
-    // The view is named where it costs no columns the list wants. Herdr paints
-    // this on the pane header via `report-metadata --title`.
+    // Herdr paints this on the pane header via `report-metadata --title`.
     expect(VIEW_TITLE.authored).toBe("My PRs");
     expect(VIEW_TITLE.inbound).toBe("Awaiting Review");
   });
 
   test("sits between what the pane is showing and how old it is", () => {
-    // The count says what you are looking at and the age says whether to trust
-    // it; the control to change the first belongs next to it, not in front.
     expect(plain(header(list.rows, opts()))).toMatch(/inbound · toggle view · \d+s ago$/);
   });
 
@@ -98,32 +91,25 @@ describe("the view switcher", () => {
   });
 
   test("points at a list a plain click can open", () => {
-    // The pane acts on the plain click itself, but it cannot guarantee it owns
-    // every click on its own links: anywhere the capture does not apply the URL
-    // is simply opened, so it has to be somewhere worth landing rather than a
-    // private scheme nothing can open.
+    // Where the mouse capture does not apply, the terminal opens the URL.
     for (const view of ["authored", "inbound"] as const) {
       expect(viewUrl(view)).toStartWith("https://github.com/");
     }
   });
 
   test("shortens before it disappears", () => {
-    // A pane too narrow for "toggle view" keeps a control that says less. The
-    // labels are offered longest-first, so this is the middle of the ladder.
     const line = plain(header(list.rows, opts({ cols: 34 })));
     expect(line).toContain(" · toggle");
     expect(line).not.toContain("toggle view");
     expect(width(line)).toBeLessThanOrEqual(34);
 
-    // And narrower still, the glyph — a control at every width the pane has.
     const tighter = plain(header(list.rows, opts({ cols: 30 })));
     expect(tighter).toContain(" · ⇄");
     expect(width(tighter)).toBeLessThanOrEqual(30);
   });
 
   test("is dropped rather than clipping the summary", () => {
-    // The summary is what the line exists to say. A pane too narrow to hold
-    // even the shortest label loses the control, not the count or the age.
+    // Below the shortest label the control goes; the count and age stay.
     const narrow = plain(header(list.rows, opts({ cols: 24 })));
     for (const label of SWITCHER_LABELS) expect(narrow).not.toContain(label);
     expect(narrow).toContain("6 inbound");
@@ -132,7 +118,6 @@ describe("the view switcher", () => {
   });
 
   test("never clips its own label, at any width", () => {
-    // A label is offered whole or not at all: half a control says nothing.
     for (let cols = 10; cols <= 60; cols++) {
       const line = plain(header(list.rows, opts({ cols })));
       expect(width(line)).toBeLessThanOrEqual(cols);
@@ -142,7 +127,6 @@ describe("the view switcher", () => {
   });
 
   test("is offered before the first fetch, where the timer will be", () => {
-    // A cold start has no age for it to sit in front of, so it goes last.
     expect(plain(header([], opts({ cols: 60, fetchedAt: null })))).toEndWith(" · toggle view");
   });
 });
@@ -202,7 +186,7 @@ describe("overflow", () => {
   test("drops the oldest, which is the bottom of a newest-first list", () => {
     const lines = render(list.rows, opts({ rows: 9 })).map(plain);
     const body = lines.join("\n");
-    // #104 is the newest and must survive; #105 is the oldest and must not.
+    // #104 is the newest, #105 the oldest.
     expect(body).toContain("#104");
     expect(body).not.toContain("#105");
   });

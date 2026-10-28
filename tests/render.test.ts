@@ -21,7 +21,6 @@ import {
 const live = parseSearch(await Bun.file("tests/fixtures/search.json").json());
 const states = parseSearch(await Bun.file("tests/fixtures/states.json").json());
 
-/** The set the widget draws when nothing is configured. */
 const UNI = glyphsFor("unicode");
 
 const NOW = 1_800_000_000_000;
@@ -43,17 +42,13 @@ const pr = (n: number): PrRow => {
   return row;
 };
 
-// Every assertion about layout measures visible columns, so escapes never
-// silently pass for content.
 const RESET = "\x1b[0m";
-// Intensity runs close with normal-intensity, never a full reset: a reset
-// would also drop the colour the run sits inside.
+// Intensity runs close with `22`: a full reset would also drop the enclosing colour.
 const NORMAL = "\x1b[22m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
 
-/** Every intensity terminator inside a dimmed row must re-open dim, or the
- * rest of the line renders at full brightness. */
+/** Every intensity terminator inside a dimmed row must re-open dim. */
 const dimThroughout = (line: string) =>
   line.startsWith(DIM) && line.endsWith(NORMAL) &&
   line.slice(DIM.length, -NORMAL.length).split(NORMAL).slice(1)
@@ -65,8 +60,7 @@ const prAge = (row: PrRow) => compactAge(NOW - Date.parse(row.createdAt));
 
 const vis = (s: string) => width(s);
 
-// A heading is a name, a dim rule out to the right edge and, when the group
-// has PRs needing you, a count; comparisons care about the name.
+// A heading is a name, a dim rule and an optional count. Compare the name only.
 const headingName = (s: string) =>
   s.replace(/\x1b\[\d+m/g, "").replace(new RegExp(` ${RULE}+.*$`), "");
 
@@ -92,41 +86,31 @@ describe("renderRow", () => {
   });
 
   test("a conflict gets its own reserved column in the cluster", () => {
-    // The cell is reserved on every row, conflicted or not, so the cluster
-    // still aligns down the pane — the same rule the band's count cell
-    // follows. A conflicted row spends it; every other row leaves it blank.
+    // Every row reserves the cell, so the cluster aligns down the pane.
     const conflicted = plain(renderRow(pr(119), opts())[0]);
     const clean = plain(renderRow(pr(112), opts())[0]);
     expect(conflicted).toContain(UNI.conflict);
     expect(clean).not.toContain(UNI.conflict);
-    // Mergeability GitHub has not computed yet paints nothing at all — the
-    // no-news case has to be silent on the *line*, not merely false in the row.
+    // Mergeability that GitHub has not computed yet paints nothing.
     expect(plain(renderRow(pr(122), opts())[0])).not.toContain(UNI.conflict);
     expect(plain(renderRow(pr(123), opts())[0])).not.toContain(UNI.conflict);
     expect(vis(renderRow(pr(119), opts())[0])).toBe(44);
-    // Same right edge, so the reserved cell is what pays for the glyph rather
-    // than the cluster growing on the rows that carry one.
+    // Same right edge: the reserved cell pays for the glyph.
     expect(conflicted.length - conflicted.trimEnd().length)
       .toBe(clean.length - clean.trimEnd().length);
   });
 
   test("the cluster's glyphs are evenly separated, conflict included", () => {
-    // Every cell is one column with one column between it and its neighbour,
-    // so a row carrying all of them reads as spaced cells rather than as a
-    // run of glyphs jammed together. #121 conflicts, has changes requested and
-    // is failing, so it is the row that carries the most at once.
+    // #121 conflicts, has changes requested and fails CI: the most cells at once.
     const line = plain(renderRow(pr(121), opts())[0]);
     const cluster = line.slice(-9);
-    // conflict, separator, review, separator, the four-wide flag cell (empty
-    // here), then CI on the pane edge.
+    // conflict, space, review, space, four-wide flag cell (empty), CI.
     expect(cluster).toBe("⊘ ✗     ✗");
   });
 
   test("LOUD is a prefix of PRECEDENCE, or the needs-you count is wrong", () => {
-    // `header` and `repoHeader` both count from a row's *headline*, which is
-    // only equivalent to "carries a loud signal" while the loud signals are the
-    // top of the precedence order. Re-rank one without the other and the counts
-    // go quietly wrong, which is the kind of bug this widget has no symptom for.
+    // `header` and `repoHeader` count from a row's headline. That equals "carries
+    // a loud signal" only while the loud signals top the precedence order.
     expect(LOUD).toEqual(PRECEDENCE.slice(0, LOUD.length));
   });
 
@@ -137,8 +121,7 @@ describe("renderRow", () => {
   });
 
   test("a conflicting draft stays dim throughout, glyph included", () => {
-    // Bold is suppressed on a draft — the row is already dim, and bold inside
-    // dim renders inconsistently — so the conflict shows without it.
+    // Bold inside dim renders inconsistently, so a draft drops bold.
     const line = renderRow(pr(120), opts())[0];
     expect(dimThroughout(line)).toBe(true);
     expect(plain(line)).toContain(UNI.conflict);
@@ -157,8 +140,6 @@ describe("renderRow", () => {
     const row = { ...pr(113), branch: "a-very-long-branch-name-indeed" };
     const [line] = renderRow(row, opts({ cols: 24 }));
     expect(vis(line)).toBe(24);
-    // The glyph cluster is what must not be truncated: the branch gives up
-    // columns first, so the trailing check glyph is still present.
     expect(line).toContain("✓");
     expect(line).toContain(ELLIPSIS);
   });
@@ -171,9 +152,8 @@ describe("renderRow", () => {
   });
 
   test("a dimmed draft stays dim past every inner escape", () => {
-    // A draft's own dim run wraps a line that already contains one — the age
-    // stamp's. SGR intensity has no pop, so the inner terminator would end the
-    // row's dim early and leave everything after it bright.
+    // SGR intensity has no pop: the age stamp's terminator would end the
+    // draft's dim early.
     for (const [l1, l2] of [renderRow(pr(108), opts())]) {
       expect(dimThroughout(l1!)).toBe(true);
       expect(dimThroughout(l2!)).toBe(true);
@@ -190,16 +170,13 @@ describe("renderRow", () => {
     const plain = renderRow({ ...pr(100), linked: false }, opts())[0];
     expect(linked).toContain(UNI.linked);
     expect(plain).not.toContain(UNI.linked);
-    // Both start names on the same column.
     expect(vis(linked)).toBe(vis(plain));
   });
 
   test("the title is an OSC 8 hyperlink to the PR", () => {
     const [, l2] = renderRow(pr(100), opts());
     expect(l2).toContain(`\x1b]8;;${pr(100).url}\x1b\\`);
-    // The hyperlink closes before the age stamp: the stamp is not part of the
-    // clickable region, and an unclosed OSC 8 would swallow the rest of the
-    // pane into the link.
+    // An unclosed OSC 8 would swallow the rest of the pane into the link.
     expect(l2).toContain("\x1b]8;;\x1b\\");
     expect(l2.endsWith(NORMAL)).toBe(true);
   });
@@ -210,8 +187,7 @@ describe("renderRow", () => {
 
   test("a clean row leaves its branch uncoloured — the glyphs may still speak", () => {
     const [l1] = renderRow(pr(112), opts());
-    // The branch must not be wrapped in a colour run. A passing check is still
-    // allowed its green glyph: "clean" means the row is silent, not blank.
+    // No colour run wraps the branch. A passing check keeps its green glyph.
     expect(l1).toMatch(/(?<!\x1b\[\d+m)b112/);
     expect(l1).toContain("\x1b[32m✓");
   });
@@ -332,8 +308,7 @@ describe("header", () => {
   });
 
   test("a cold start does not claim the list is clear", () => {
-    // Empty before the first fetch means "nothing asked yet", not "nothing
-    // open": the pane says only that it is loading.
+    // Before the first fetch an empty list means nothing has been asked yet.
     const out = render([], opts({ fetchedAt: null }));
     expect(out.join("\n")).not.toContain("all clear");
     expect(out.join("\n")).toContain("loading");
@@ -341,7 +316,7 @@ describe("header", () => {
 
   test("the loading line spins, so a cold start is not mistaken for a hang", () => {
     expect(header([], opts({ fetchedAt: null }))).toContain(spinner(NOW));
-    // One frame per second, matching the pane's repaint cadence.
+    // One frame per second, the pane's repaint cadence.
     expect(spinner(NOW)).toBe(spinner(NOW + 999));
     expect(spinner(NOW)).not.toBe(spinner(NOW + 1000));
     expect(spinner(NOW)).toBe(spinner(NOW + 1000 * SPINNER.length));
@@ -368,12 +343,9 @@ describe("render", () => {
   test("an empty list says so rather than rendering a blank pane", () => {
     const out = render([], opts());
     expect(out).toHaveLength(3);
-    // The header already carries `0 open`; this line says the other half.
     expect(out[0]).toContain("0 open");
     expect(out[1]).toBe("");
     expect(out[2]).toContain("all clear");
-    // The commonest good state gets a mark of its own, so it does not read
-    // like the blank pane of a widget that has died.
     expect(out[2]).toContain("\x1b[32m✓");
   });
 
@@ -384,17 +356,14 @@ describe("render", () => {
   });
 
   test("a heading per repo plus two lines per PR when everything fits", () => {
-    // Three repositories across the twelve PRs, with a blank line between
-    // each pair of groups.
-    // Header, the blank line under it, three headings, twenty-four row lines
-    // and two blank lines between groups.
+    // Header, blank, three headings, two lines per PR, two blanks between groups.
     expect(render(live.rows, opts({ rows: 40 })))
       .toHaveLength(1 + 1 + 3 + 12 * 2 + 2);
   });
 
   test("groups are separated by one blank line, and never led by one", () => {
     const out = render(live.rows, opts({ rows: 40 }));
-    // Two separators between three groups, plus the one under the header.
+    // Two between three groups, plus one under the header.
     expect(out.filter((l) => l === "")).toHaveLength(3);
     expect(out[1]).toBe("");
     expect(out[2]).not.toBe("");
@@ -436,7 +405,6 @@ describe("render", () => {
     expect(headingName(band)).toBe("web-app");
     expect(plain(band).endsWith(" 2")).toBe(true);
 
-    // A group with nothing to act on stays a label: no count at all.
     const quiet = repoHeader({ owner: "acme", repo: "web-app", rows: [calm] }, opts());
     expect(vis(quiet)).toBe(44);
     expect(/\d$/.test(plain(quiet))).toBe(false);
@@ -463,7 +431,6 @@ describe("render", () => {
     const out = render(live.rows, opts({ rows: 19 }));
     for (const row of live.rows) expect(out.join("\n")).toContain(row.branch);
     expect(out.join("\n")).not.toContain("older");
-    // A compact row keeps its link, and its number moves onto the branch line.
     const line = out.find((l) => l.includes(live.rows[0]!.branch))!;
     expect(line).toContain(`\x1b]8;;${live.rows[0]!.url}\x1b\\`);
     expect(line).toContain(`#${live.rows[0]!.number}`);
@@ -480,15 +447,13 @@ describe("render", () => {
 
   test("a compact row keeps its signals and drops nothing but the title", () => {
     const line = compactRow(pr(109), opts({ cols: 44 }));
-    // #109 is the capped-thread PR: the cluster must survive intact.
+    // #109 carries the capped thread count.
     expect(line).toContain("⚑99+");
     expect(line).toContain(pr(109).branch);
     expect(line).toContain(`\x1b]8;;${pr(109).url}\x1b\\`);
   });
 
   test("a compact row keeps the age compaction used to lose", () => {
-    // The list is ordered oldest-first so that "how long has this been
-    // sitting" is answerable; dropping the title must not drop the answer.
     const row = live.rows[0]!;
     const line = compactRow(row, opts({ cols: 80 }));
     expect(vis(line)).toBe(80);
@@ -500,16 +465,11 @@ describe("render", () => {
     const room = (cols: number) => plain(compactRow(row, opts({ cols })));
     const widths = Array.from({ length: 70 }, (_, i) => i + 20);
 
-    // The number appears at a width the age still cannot afford, and the
-    // branch is on screen at every width including the narrowest.
     const withNumber = widths.find((c) => room(c).includes(`#${row.number}`))!;
     const withAge = widths.find((c) => room(c).includes(prAge(row)))!;
     expect(room(withNumber)).not.toContain(prAge(row));
     expect(withAge).toBeGreaterThan(withNumber);
-    // Six characters, not eight: the conflict cell and its separator are
-    // reserved on every row, so at the narrowest width the branch has two
-    // columns less to spend than it did before that cell existed. That is the
-    // cost the reserved cell was accepted at, and this is where it shows.
+    // Six characters: the reserved conflict cell and its separator cost two.
     for (const cols of [20, withNumber, withAge, 80]) {
       expect(room(cols)).toContain(row.branch.slice(0, 6));
     }
@@ -560,13 +520,10 @@ describe("notice", () => {
   test("sits on the last line, under the final repository", () => {
     const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
     expect(out.at(-1)).toContain(NOTICE);
-    // Under the list, not inside it: the line above is still a pull request.
     expect(out.at(-2)).not.toContain(NOTICE);
   });
 
   test("is marked and coloured as attention, not as failure", () => {
-    // A refused config entry is not a broken widget: the list above it is
-    // correct, and there is something to go and fix.
     const out = render(live.rows, opts({ rows: 40, notice: NOTICE }));
     expect(out.at(-1)).toContain("\x1b[33m⚠");
   });
@@ -577,16 +534,12 @@ describe("notice", () => {
   });
 
   test("appears under `all clear` when the list is empty", () => {
-    // The case an ignore list makes likeliest: everything ignored, and the one
-    // thing worth saying is that some of the ignoring did not parse.
     const out = render([], opts({ notice: NOTICE }));
     expect(out.at(-1)).toContain(NOTICE);
     expect(out.at(-2)).toContain("all clear");
   });
 
   test("costs a pull request rather than being clipped away", () => {
-    // A row that is not on screen is counted by `+N older`; a notice that is
-    // not on screen is the bug this line exists to fix.
     const rows = 12;
     const with_ = render(live.rows, opts({ rows, notice: NOTICE }));
     const without = render(live.rows, opts({ rows }));
@@ -604,12 +557,8 @@ describe("notice", () => {
   });
 
   test("survives every pane tall enough to hold a second line", () => {
-    // The budget assertion above passes whether the notice is on screen or
-    // clipped away, because `render` ends in a slice — so on its own it reads
-    // as a guard for the reservation while measuring something else entirely.
-    // This is the half that has to be checked directly: the marker used to
-    // escape the reservation at `keep === 0` and the slice trimmed the notice
-    // instead of it, silently, in every pane of three rows or fewer.
+    // The budget test passes even when `render`'s final slice clips the notice,
+    // so assert the notice directly.
     for (const rows of [2, 3, 4, 5, 11, 26, 40]) {
       const out = render(live.rows, opts({ rows, notice: NOTICE }));
       expect(out.some((l) => l.includes("IGNORE_REPOS"))).toBe(true);
@@ -618,16 +567,14 @@ describe("notice", () => {
   });
 
   test("yields to the header alone in a one-row pane", () => {
-    // The one pane where losing it is right: the header carries the count, the
-    // age and the switcher, and a notice in its place would cost all three.
+    // The header's count, age and switcher outrank the notice.
     const out = render(live.rows, opts({ rows: 1, notice: NOTICE }));
     expect(out).toHaveLength(1);
     expect(out[0]).not.toContain("IGNORE_REPOS");
   });
 
   test("the `+N older` marker gives up its line before the notice does", () => {
-    // Both want the last line of a very short pane. The marker restates what
-    // the header already counts; the notice is the only place its fact appears.
+    // The marker repeats the header's count. The notice has no other place.
     const out = render(live.rows, opts({ rows: 3, notice: NOTICE }));
     expect(out.at(-1)).toContain(NOTICE);
     expect(out.some((l) => l.includes("older"))).toBe(false);
@@ -642,9 +589,8 @@ describe("notice", () => {
   });
 
   test("leaves a column spare, because the glyph may render wide", () => {
-    // U+26A0 is East-Asian Ambiguous: `width()` counts it as one column and a
-    // terminal set to render ambiguous glyphs wide makes it two. On the last
-    // line of the pane that difference wraps the frame a row over budget.
+    // U+26A0 is East-Asian Ambiguous: `width()` counts one column, and a terminal
+    // that draws it wide wraps the last line over budget.
     for (const cols of [12, 20, 40, 80]) {
       const out = render(live.rows, opts({ rows: 40, cols, notice: NOTICE }));
       expect(width(out.at(-1)!)).toBeLessThanOrEqual(cols - 1);
@@ -652,8 +598,7 @@ describe("notice", () => {
   });
 
   test("is dropped rather than shown as a bare ellipsis", () => {
-    // Clipped to a column or two the notice becomes `…`, which reads as a
-    // truncated pull request. Nothing is better than a glyph that misleads.
+    // A bare `…` reads as a truncated pull request.
     for (const cols of [1, 4, 8, 10]) {
       const out = render(live.rows, opts({ rows: 40, cols, notice: NOTICE }));
       expect(out.some((l) => l.includes("\u26a0"))).toBe(false);
@@ -667,14 +612,8 @@ describe("notice", () => {
 });
 
 describe("glyph sets in the pane", () => {
-  // Every mark the *lead* and the cluster's fixed cells can draw at once.
-  // Built rather than taken from a fixture: no real pull request carries all of
-  // them, and this asserts arithmetic rather than precedence.
-  //
-  // It cannot carry them all even so — `review` and `ci` are one value each, so
-  // a single row leaves four marks unrendered. The width test below loops over
-  // both cells for that reason; a mark that only ever appears on a row nothing
-  // measures is a mark whose width is untested.
+  // Every mark the lead and fixed cells can draw at once. `review` and `ci` hold
+  // one value each, so the width test below loops over both.
   const loaded: PrRow = {
     owner: "acme",
     repo: "web-app",
@@ -716,10 +655,7 @@ describe("glyph sets in the pane", () => {
     }
   });
 
-  // Every mark the set has, actually painted by the renderer. Without this the
-  // review and CI marks the loaded row cannot carry — and the all-clear mark,
-  // which only an *empty* pane draws — were reachable only through `glyphsFor`,
-  // which is the module under test rather than the surface that uses it.
+  // Only an empty pane draws the all-clear mark, so the empty render is included.
   test("every mark in the set reaches the pane", () => {
     for (const glyphs of SETS) {
       const g = glyphsFor(glyphs);
@@ -754,8 +690,6 @@ describe("glyph sets in the pane", () => {
   });
 
   test("the cluster costs the same columns in either set", () => {
-    // If the two sets cost different widths, the branch name they leave room
-    // for differs — which is the symptom a width regression actually shows.
     for (const view of ["authored", "inbound"] as const) {
       const [a] = renderRow(loaded, opts({ cols: 30, view, glyphs: "unicode" }));
       const [b] = renderRow(loaded, opts({ cols: 30, view, glyphs: "nerd" }));

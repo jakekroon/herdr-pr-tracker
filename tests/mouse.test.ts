@@ -1,5 +1,3 @@
-// The click path, offline: reports in, targets out, and the one comparison that
-// decides whether a click switches the pane or opens a browser.
 import { describe, expect, test } from "bun:test";
 import { parseInbound } from "../src/model.ts";
 import { hitAt, hitTargets, render, type RenderOpts, width } from "../src/render.ts";
@@ -33,16 +31,14 @@ describe("parseMouse", () => {
   });
 
   test("reports the modifier bits separately", () => {
-    // 16 is control, 8 is meta. iTerm2 sends a cmd-click as meta, which is why
-    // the pane cannot tell one from Option — and why it acts on the plain click.
+    // 16 is control, 8 is meta. iTerm2 sends a cmd-click as meta.
     const { events } = parseMouse("\x1b[<16;1;1M\x1b[<8;1;1M");
     expect(events[0]?.ctrl).toBe(true);
     expect(events[1]?.alt).toBe(true);
   });
 
   test("drops motion and wheel reports", () => {
-    // Bit 5 is motion, bit 6 the wheel. Neither is a click, and both arrive far
-    // more often than one.
+    // Bit 5 is motion, bit 6 the wheel.
     expect(parseMouse("\x1b[<35;4;4M\x1b[<64;4;4M").events).toEqual([]);
   });
 
@@ -54,8 +50,7 @@ describe("parseMouse", () => {
   });
 
   test("does not accumulate input that is not a report", () => {
-    // The pane is keyboard-deaf; anything typed at it must be dropped rather
-    // than buffered until the process runs out of memory.
+    // Typed input is dropped, not buffered without limit.
     expect(parseMouse("hello there").rest).toBe("");
   });
 });
@@ -68,7 +63,6 @@ describe("hitTargets", () => {
     const lines = frame();
     for (const t of hitTargets(lines)) {
       const text = plain(lines[t.row - 1] ?? "");
-      // The span must land on visible text, not on the padding either side.
       expect(text.slice(t.from - 1, t.to).trim().length).toBeGreaterThan(0);
       expect(t.to).toBeLessThanOrEqual(text.length);
     }
@@ -78,8 +72,6 @@ describe("hitTargets", () => {
     const t = hitTargets(frame());
     const sw = t.find((x) => x.url === viewUrl("authored"));
     expect(sw?.row).toBe(1);
-    // Whatever label the width allowed, every column of it is the button — the
-    // span is derived from the painted frame, so it cannot disagree.
     const label = SWITCHER_LABELS.find((l) => plain(frame()[0] ?? "").includes(l))!;
     expect(sw!.to - sw!.from + 1).toBe(width(label));
   });
@@ -90,23 +82,19 @@ describe("hitTargets", () => {
   });
 
   test("survives the compact layout, where the link moves to the branch", () => {
-    // Compaction is chosen by `render`, so a short pane is how it is reached.
+    // `render` compacts a short pane.
     const t = hitTargets(frame({ rows: 8 }));
     expect(t.some((x) => x.url.includes("/pull/"))).toBe(true);
     expect(t.some((x) => x.url === viewUrl("authored"))).toBe(true);
   });
 
   test("stops at an OSC 8 whose terminator was cut off", () => {
-    // `clip` runs before the escapes go on, so this should be unreachable — but
-    // a truncation bug upstream must not make the rest of the line clickable at
-    // the wrong columns. Silently opening the wrong pull request is worse than
-    // opening none.
+    // An unclosed link would make the rest of the line open the wrong pull request.
     expect(hitTargets(["ok \x1b]8;;https://example.com/never-closed"])).toEqual([]);
   });
 
   test("closes an open hyperlink at the end of the line", () => {
-    // The terminator is there, the closing OSC 8 is not: the link text is still
-    // exactly the columns it covers, so it stays clickable.
+    // The opening terminator bounds the link text, so it stays clickable.
     expect(hitTargets(["\x1b]8;;https://example.com\x1b\\text"])).toEqual([
       { row: 1, from: 1, to: 4, url: "https://example.com" },
     ]);
@@ -134,8 +122,7 @@ describe("hitAt", () => {
 });
 
 describe("what a click does", () => {
-  // The pane tells the switcher from a pull request by URL alone, so that
-  // comparison is the whole routing rule.
+  // The pane tells the switcher from a pull request by URL alone.
   test("the switcher's URL is the other view's, in both views", () => {
     for (const view of ["authored", "inbound"] as const) {
       const t = hitTargets(frame({ view }));
