@@ -1,14 +1,12 @@
 # herdr-pr-tracker
 
-A [Herdr](https://herdr.dev) plugin. It shows **all open pull requests that you
-wrote**, from all repositories you can see. The list docks on the right of the
-current tab.
+A [Herdr](https://herdr.dev) plugin that lists your open pull requests in a
+widget on the right of the current tab. The plugin reads GitHub and does not
+change a pull request.
 
-The plugin only tracks. It does not open, close, merge or comment on a pull
-request.
-
-A second view shows the pull requests that **wait for your review**. The widget
-shows one view at a time. See [Two views](#two-views).
+The widget has two views. `My PRs` shows the pull requests that you opened, in
+all repositories that you can see. `Awaiting Review` shows the pull requests
+that wait for your review.
 
 ```
    5 open · 2 need you · toggle · 12s ago
@@ -30,256 +28,112 @@ metrics-service ─────────────────────�
     #412 Move the nightly import behind … 1h
 ```
 
-The first line is a summary. Each repository has a heading. Each pull request
-has two lines:
+## Install
 
-1. The branch and its status marks.
-2. The number, the title and the age of the pull request.
+You need Herdr 0.8.0, `bun` 1.2 and `gh` 2.24, or later versions, and `git`
+on your `PATH`. `gh auth status` must show no errors.
 
-**The title is a link.** Click it to open the pull request in your browser.
-
-## Marks
-
-| Mark | Meaning | Colour |
-|---|---|---|
-| `⊘` | A conflict stops the merge | red |
-| `✗` in the review column | The reviewer requests changes | red |
-| `✗` in the check column | Checks fail | red |
-| `⚑N` | `N` review threads are open | yellow |
-| `◆` | A required review is not done | magenta |
-| `●` | Checks are in progress | blue |
-| `✓` in the review column | Approved | green |
-| `✓` in the check column | Checks pass | green |
-| `◌` | Draft. The row is dim | dim |
-| **bold** branch | `My PRs` only. A conflict, requested changes, failed checks or open threads. You must act on these four | none |
-| `▪` | A Herdr workspace has this branch open | dim |
-| `◦` | `Awaiting Review` only. You are in the conversation, but nobody asked for your review | plain |
-| `N` after a repository heading | `My PRs` only. The number of pull requests in that repository that need you | the loudest colour of those rows |
-| no mark | Ready for review. No action | plain |
-| `⚠` below the list | A `config` error. See [Configuration](#configuration) | yellow |
-
-One pull request can show many marks. Each mark has its own cell, so a loud mark
-does not hide a quiet mark.
-
-The row colour is the colour of its loudest mark. The order is: conflict,
-changes requested, failed checks, open threads, review required, checks in
-progress, approved, clean.
-
-### Nerd Font marks
-
-Most monospace fonts do not have these marks. Monaco, the macOS default, has
-one of the eleven (`◆`). The OS draws the other ten from different fonts, so the
-marks can look different.
-
-`GLYPHS=nerd` uses [Octicons](https://primer.style/octicons/), the GitHub icon
-set. The cells, widths and meanings do not change. The review result and the
-check result also get different marks. The default set uses `✓` for both.
-
-Add this line to `config`:
-
-```
-GLYPHS=nerd
+```bash
+herdr plugin install jakekroon/herdr-pr-tracker
 ```
 
-The plugin reads two `config` files: the copy beside the plugin
-(`cp config.example config`), then the copy in
-`herdr plugin config-dir herdr-pr-tracker`. The second file wins.
+The widget opens on the next tab change. In a script, add `--yes`, because
+Herdr asks you to confirm. To install one version, add `--ref <tag>`. To change
+the plugin, link a checkout with `herdr plugin link <path>`.
 
-To go back, set `GLYPHS=unicode` or delete the line. Use lower case. The plugin
-ignores other values and uses the default.
+### Show the pull request in the sidebar
 
-| Mark | Octicon | | Mark | Octicon |
-|---|---|---|---|---|
-| conflict | `no-entry` | | draft | `git-pull-request-draft` |
-| changes requested | `x-circle` | | workspace open | `git-branch` |
-| checks fail | `x` | | in the conversation | `comment` |
-| open threads | `comment-discussion` | | checks in progress | `dot-fill` |
-| review required | `eye` | | approved | `check-circle` |
-| config error | `alert` | | checks pass | `check` |
-| no open pull requests | `checklist` | | sidebar update | `sync` |
-
-You need a font with these marks:
-
-| Ghostty | No action. Ghostty contains Symbols Nerd Font 3.4.0 |
-|---|---|
-| **iTerm2** | `brew install --cask font-symbols-only-nerd-font`, then Profiles → Text → "Use a different font for non-ASCII text" |
-| **Other terminals** | Use a patched [Nerd Font](https://www.nerdfonts.com) as the terminal font |
-
-The widget reads `config` one time, when it starts. A plugin reload does not
-restart it. After you change `GLYPHS`, close the widget:
-
-```sh
-herdr plugin pane close <pane-id>   # the id from `herdr pane list`
-```
-
-The widget opens again on the next tab change. If the font does not have a
-mark, the cell is blank. Look at the widget to make sure the marks show.
-
-### Rules for colour and marks
-
-- **A clean pull request has no colour.** If all rows have colour, the colour
-  gives no information.
-- **Bold shows your work.** Your action clears four signals: a conflict,
-  requested changes, failed checks and open threads. These four are bold. The
-  summary counts them as `need you`.
-- **A conflict is first in both views.** The review and the checks do not
-  matter until the conflict is gone. Each row keeps a column for the conflict
-  mark, so the marks stay aligned.
-- **An unknown conflict shows no mark.** GitHub calculates mergeability after a
-  delay. A conflict can show one poll after its row.
-- **The widget does not show "behind the base branch".** GitHub reports only one
-  merge state at a time. That state hides "behind" when another state is also
-  true.
-- **A cancelled check is not a failure.** A new push cancels most of these runs.
-- **Checks in progress are blue, not green.** Green means the checks passed.
-- **A draft is dim.** A failed check on a draft shows in dim red.
-- **All open threads count.** This includes threads that you replied to. The
-  widget shows the GitHub count and does not guess who must act next.
-- **`▪` shows which branches you have checked out.** The GitHub list cannot
-  show this.
-
-### Order and overflow
-
-The list shows the **oldest first**, by creation date. A status change does not
-move a row.
-
-If the list is too tall for the widget, **each pull request goes to one line**.
-The widget removes the title line and puts the link on the branch.
-
-If one line for each pull request is also too tall, the widget removes the
-oldest rows. A `… +N older` row shows how many it removed. This row is next to
-the rows that it replaces.
-
-## Two views
-
-The widget title shows the view:
-
-| Title | Shows |
-|---|---|
-| `My PRs` | The pull requests that you opened. This is the default. The code calls it the *authored* view. |
-| `Awaiting Review` | The pull requests that wait for you. Someone asked for your review, you gave a review, or you are in the conversation. The code calls it the *inbound* view. |
-
-**Click `toggle` in the summary line** to change the view. No setup is
-necessary. In a narrow widget, the control is `⇄`. In a very narrow widget, the
-control is not there.
-
-A click on a pull request opens it in the browser. You can also change the view
-with `herdr plugin action invoke` or with a keybinding (see
-[Keybindings](#keybindings)).
-
-```
-    3 inbound · toggle view · 12s ago
-
-platform ─────────────────────────────────
-    priya chore/toolchain                  ●
-     #104 Bump the pinned toolchain       2d
-  ◦ wren chore/seeds                       ✓
-     #105 Tidy the seed script           10d
-
-web-app ──────────────────────────────────
-    priya fix/webhook-retry          ◆     ✗
-     #101 Retry the webhook dispatcher o… 5d
-```
-
-In the inbound view, the work belongs to another person. Thus:
-
-- **Each row starts with the author.** The branch comes after the author if
-  there is space.
-- **`◦` shows a row that nobody asked you to review.** Someone assigned you,
-  mentioned you, or you wrote a comment.
-- **The colour order is different.** The order is: conflict, review required,
-  checks in progress, clean, open threads, failed checks, approved, changes
-  requested. A conflict is first because you cannot review it. Requested changes
-  are last because they are usually your own result. Failed checks and open
-  threads are the work of the author.
-- **There is no `need you` count and no bold.** All rows in this view need you.
-- **The list shows the newest first.** GitHub removes a review request after you
-  review. Thus the view also shows pull requests that you reviewed, so that you
-  can see the next step. The oldest rows are the pull requests that you
-  completed. The widget removes these first.
-
-The plugin keeps your view after a restart. Each view has its own cache.
-
-## Sidebar token
-
-The plugin adds a token to the sidebar row of the focused agent pane. The token
-shows the pull request for the branch of that pane:
-`#21288 ✓`, or `◌#21288 ✓` for a draft. To show it, add `$pr` to the agent row:
+The plugin can add a token to the sidebar row of the focused agent pane. The
+token shows the pull request for the branch of that pane: `#21288 ✓`, or
+`◌#21288 ✓` for a draft. Add `$pr` to the agent row in your Herdr config:
 
 ```toml
 [ui.sidebar.agents]
 rows = [["state_icon", "workspace", "tab", "$pr"], ["agent"]]
 ```
 
-This token replaces the `gh-pr` plugin.
+The token replaces the `gh-pr` plugin.
 
-## Requirements
+## Read the list
 
-- Herdr 0.8.0 or later
-- `bun` 1.2 or later
-- `gh` 2.24 or later. `gh auth status` must show no errors
-- `git` on your `PATH`
+The first line is a summary: the count, the number that need you, the view
+control and the age of the data. Under each repository heading, a pull request
+has two lines: the branch with its marks, then the number, title and age. Click
+the title to open the pull request in your browser.
 
-## Install
+### Marks
 
-```bash
-herdr plugin install jakekroon/herdr-pr-tracker
-```
+The table gives the marks in priority order. The colour of a row is the colour
+of its highest mark. Each mark has its own cell, so a high mark does not hide a
+low mark.
 
-There is no daemon, no config file and no build step.
+| Mark | Nerd Font | Meaning | Colour |
+|---|---|---|---|
+| `⊘` | `no-entry` | A conflict stops the merge | red |
+| `✗` in the review column | `x-circle` | The reviewer requests changes | red |
+| `✗` in the check column | `x` | Checks fail. A cancelled check is not a failure | red |
+| `⚑N` | `comment-discussion` | `N` review threads are open, also threads that you replied to | yellow |
+| `◆` | `eye` | A required review is not done | magenta |
+| `●` | `dot-fill` | Checks are in progress | blue |
+| `✓` in the review column | `check-circle` | Approved | green |
+| `✓` in the check column | `check` | Checks pass | green |
+| no mark | | Ready for review | plain |
+| `◌` | `git-pull-request-draft` | Draft. The row is dim, and a failed check is dim red | dim |
+| `▪` | `git-branch` | A Herdr workspace has this branch open | dim |
+| `◦` | `comment` | `Awaiting Review` only. Nobody asked for your review, but you are in the conversation | plain |
+| `N` after a heading | | `My PRs` only. The number of pull requests in that repository that need you | the colour of the highest row |
+| `⚠` below the list | `alert` | A bad entry in `config`. See `config.example` | yellow |
+| `✓ all clear` | `checklist` | You have no open pull requests | green |
+| `⟳` in the sidebar | `sync` | The plugin is updating the token | plain |
 
-Herdr asks you to confirm the install. A script has no terminal to answer, so
-add `--yes`:
+In `My PRs`, a bold row needs an action from you: a conflict, requested
+changes, failed checks or open threads. The summary counts these rows as
+`need you`.
 
-```bash
-herdr plugin install jakekroon/herdr-pr-tracker --yes
-```
+### Order and overflow
 
-To use one version, add `--ref`:
+`My PRs` shows the oldest first, by creation date. A status change does not move
+a row.
 
-```bash
-herdr plugin install jakekroon/herdr-pr-tracker --ref v0.5.1
-```
+If the list is too tall for the widget, each pull request goes to one line. The
+title line goes, and the link moves to the branch. If the list is still too
+tall, the widget removes the oldest rows. A `… +N older` row shows the number
+that it removed.
 
-To change the plugin, link a local checkout:
+The age in the summary shows when the data came from GitHub. The age is yellow
+after two poll intervals. It is red when a poll fails, with the cause:
+`auth failed`, `offline` or `rate limited`.
 
-```bash
-herdr plugin link /path/to/herdr-pr-tracker
-```
+## Change the view
 
-### Uninstall
+Click `toggle` in the summary line. In a narrow widget the control is `⇄`. In a
+very narrow widget there is no control, so use the `view-toggle` action. The
+widget keeps your view after a restart.
 
-**Close the widget before you remove the plugin.** If you remove the plugin
-first, the widget process continues to run:
+| | `My PRs` | `Awaiting Review` |
+|---|---|---|
+| Shows | Pull requests that you opened | Pull requests where someone asked for your review, you gave a review, or you are in the conversation |
+| Row starts with | The branch | The author, then the branch if there is space |
+| Order | Oldest first | Newest first |
+| Bold and `need you` | Yes | No. All rows need you |
+| Colour priority | Conflict, changes requested, failed checks, open threads, review required, checks in progress, approved, clean | Conflict, review required, checks in progress, clean, open threads, failed checks, approved, changes requested |
 
-```bash
-herdr plugin action invoke herdr-pr-tracker.toggle   # closes the widget
-herdr plugin uninstall herdr-pr-tracker              # or: unlink, for a checkout
-```
+GitHub removes a review request when you give your review. `Awaiting Review`
+keeps these pull requests, so you can see the next step.
 
-After the uninstall, Herdr does not stop the widget process. The process
-continues to ask GitHub for your pull requests each minute.
-`herdr plugin pane close` cannot find the widget then.
+## Control the widget
 
-To close a widget that stays after an uninstall, use the usual pane command.
-The widget has the label `prs`:
+| Action | Result |
+|---|---|
+| `herdr-pr-tracker.toggle` | Opens or closes the widget |
+| `herdr-pr-tracker.refresh` | Gets the data from GitHub now |
+| `herdr-pr-tracker.view-toggle` | Changes the view. Opens the widget if it is closed |
 
-```bash
-herdr pane list | grep prs
-herdr pane close <pane-id>
-```
+Run an action with `herdr plugin action invoke <action>`. The widget does not
+accept keyboard input.
 
-The uninstall keeps the config and state directories. A new install uses your
-widths, your view and your cache again. To start again with no data, delete
-these two directories:
-
-- `herdr plugin config-dir herdr-pr-tracker`
-- the plugin directory in `~/.local/state/herdr/plugins`
-
-### Keybindings
-
-A plugin cannot add a keybinding. To use a key for an action, add it to
-`~/.config/herdr/config.toml`. Then run `herdr server reload-config`:
+A plugin cannot add a keybinding. To use a key, add it to
+`~/.config/herdr/config.toml`, then run `herdr server reload-config`:
 
 ```toml
 [[keys.command]]
@@ -287,159 +141,75 @@ key = "prefix+p"
 type = "plugin_action"
 command = "herdr-pr-tracker.toggle"
 description = "toggle the PR pane"
-
-[[keys.command]]
-key = "prefix+i"
-type = "plugin_action"
-command = "herdr-pr-tracker.refresh"
-description = "refresh PR status"
-
-[[keys.command]]
-key = "prefix+m"
-type = "plugin_action"
-command = "herdr-pr-tracker.view-toggle"
-description = "toggle PR view"
 ```
 
-`view-toggle` also opens the widget when it is not on the screen.
+Do not use `alt+` keys, because they type characters in the terminal. Do not use
+`o`, `g`, `r`, `v` or `e`, because Herdr uses them.
 
-Do not use `alt+` keys. They type characters in the terminal. Do not use `o`,
-`g`, `r`, `v` or `e`. Herdr uses these keys.
+## Configure
 
-## Configuration
+The plugin works with no config. To change a setting, copy `config.example` to
+`config` in `herdr plugin config-dir herdr-pr-tracker`. `config.example` gives
+each setting, its default and the mistakes that fail with no error.
 
-The config is optional. Run `cp config.example config`, or put a `config` in
-`herdr plugin config-dir herdr-pr-tracker`. The second file wins.
-`config.example` gives all settings. You can use quotes on values.
+The widget reads `config` only when it starts, and a plugin reload does not
+restart it. After a change, close the widget with
+`herdr plugin pane close <pane-id>`. `herdr pane list` shows its id with the
+label `prs`. The widget opens again on the next tab change.
 
-The widget reads `config` one time, when it starts. After a change, toggle the
-widget off and on.
+You cannot change the signal order, the sort order or the meaning of a mark.
 
-### `SEARCH_QUERY`
+### Use Nerd Font marks
 
-`SEARCH_QUERY` sets the GitHub search for the authored view. It has no effect on
-the inbound view. The inbound view uses three fixed searches to find the `◦`
-rows.
+Most monospace fonts do not have the default marks, so the OS draws them from
+different fonts. `GLYPHS=nerd` uses GitHub's Octicons instead (see
+[Marks](#marks)). The review mark and the check mark are then different. You
+need a font with the Octicons:
 
-### `IGNORE_REPOS`
+| Terminal | Font |
+|---|---|
+| Ghostty | No action. Ghostty contains Symbols Nerd Font 3.4.0 |
+| iTerm2 | `brew install --cask font-symbols-only-nerd-font`, then Profiles → Text → "Use a different font for non-ASCII text" |
+| Other | A patched [Nerd Font](https://www.nerdfonts.com) as the terminal font |
 
-`IGNORE_REPOS` gives repositories and owners that the widget does not get, in
-**both** views:
+If a cell is blank, the font does not have the mark.
 
-```
-IGNORE_REPOS="acme/web-app acme/"
-```
+## Uninstall
 
-- `acme/web-app` is one repository.
-- `acme/` is all repositories of one owner.
-- Use spaces or commas between entries.
-- Case has no effect: `Acme/Web-App` and `acme/web-app` are one entry.
+Close the widget before you remove the plugin. Herdr does not stop the widget
+process when you remove the plugin, and the process continues to poll GitHub.
 
-**Each entry must have a slash.** The plugin ignores an entry without a slash,
-such as `web-app`. GitHub accepts that entry, removes nothing and gives no
-error.
+1. Close the widget: `herdr plugin action invoke herdr-pr-tracker.toggle`.
+2. Run `herdr pane list`. If a `prs` pane is there, close it with
+   `herdr pane close <pane-id>`. This also stops a widget left after an
+   uninstall.
+3. Remove the plugin: `herdr plugin uninstall herdr-pr-tracker`. For a linked
+   checkout, use `unlink`.
 
-For ignored entries, the widget shows `⚠ 2 bad IGNORE_REPOS entries` below the
-list. To find the bad entries, run `bun bin/pane.ts` in a terminal. It writes
-their names to stderr.
+The uninstall keeps your config, widths, view and cache. To remove them, delete
+the `herdr plugin config-dir herdr-pr-tracker` directory and the plugin
+directory in `~/.local/state/herdr/plugins`.
 
-The `⚠` line shows the config from when the widget started. After you correct
-an entry, restart the widget.
+## Limits
 
-The search removes ignored repositories before the widget gets the data. Thus,
-there is no "N ignored" count. `0 open` and `✓ all clear` apply only to what you
-track.
-
-### `IGNORE_AUTHORS`
-
-`IGNORE_AUTHORS` gives authors whose pull requests the widget does not get, in
-**both** views:
-
-```
-IGNORE_AUTHORS="octocat renovate[bot] app/dependabot"
-```
-
-- `octocat` is a user login.
-- `renovate[bot]` is a bot login. A bot needs the `[bot]` suffix.
-- `app/dependabot` is a GitHub App. It is the same as `dependabot[bot]`.
-- Use spaces or commas between entries.
-- Case has no effect.
-
-**A bot without `[bot]` removes nothing.** GitHub shows Dependabot's login as
-`dependabot`, but `-author:dependabot` matches no pull requests and gives no
-error. The plugin cannot find this mistake, because `dependabot` is also a
-valid user login.
-
-The plugin ignores an entry with `@` or a slash, such as `@octocat` or
-`acme/web-app`. The widget shows `⚠ 1 bad IGNORE_AUTHORS entry` below the list,
-as for `IGNORE_REPOS`.
-
-### `MAX_IDLE_DAYS`
-
-`MAX_IDLE_DAYS` hides pull requests with no update for that number of days, in
-**both** views:
-
-```
-MAX_IDLE_DAYS=30
-```
-
-An update is a change to the GitHub `updated` date. A comment, a push, a review,
-a label, a bot or a CI result is an update. The age on the row is the time since
-the pull request opened. There is no "N hidden" count. If you do not set it, or
-set it to `0`, there is no limit.
-
-### Fixed behaviour
-
-You cannot change the signal order, the sort order or what a mark means. With
-such a setting, you must remember it before you can read the list. `GLYPHS` and
-`COLOR` change only how the terminal draws the marks.
-
-## How it works
-
-Each poll sends one `gh api graphql` request. The request gets all pull requests
-and their data.
-
-GitHub calculates the rate-limit cost for each `search` field. The authored
-view costs **5 points** for each poll. The inbound view has three searches and
-costs **15 points**. At the default 60-second poll, this is a small part of the
-5000-point hourly limit. Each response contains `rateLimit { cost remaining }`.
-
-The plugin uses GraphQL because only GraphQL gives `isResolved` for review
-threads.
-
-Herdr does not run background jobs for plugins. Thus, the poll loop runs in the
-widget process. When you change tabs, the plugin moves the widget. The list stays
-on the screen during the move.
-
-The summary shows the age of the data:
-
-- After two poll intervals, the age is yellow.
-- If a poll fails, the age is red. The summary gives the cause: `auth failed`,
-  `offline` or `rate limited`.
-- An empty list shows `0 open` (or `0 inbound`) and `✓ all clear`.
-
-The widget does not accept keyboard input. It reads the mouse with SGR
-press/release reports.
-
-On iTerm2, macOS uses ctrl-click for its own menu. Thus, a ctrl-click does not
-get to Herdr. The widget must read the mouse to get the plain click. Herdr then
-does not open the links in the widget. The widget opens `http(s)` links itself.
+- **The widget does not show "behind the base branch".** GitHub reports one
+  merge state at a time, and another state can hide "behind".
+- **A new conflict can show one poll late.** GitHub calculates mergeability
+  after a delay, and the widget shows an unknown state as no conflict.
+- **Each poll costs rate limit.** One `gh api graphql` request gets the full
+  view. `My PRs` costs 5 points and `Awaiting Review` costs 15. At the default
+  60-second poll, that is 300 or 900 of the 5000-point hourly limit.
+- **The widget polls only while it is open.** Herdr does not run background
+  jobs for plugins, so the poll runs in the widget process.
+- **The widget opens links itself.** On iTerm2, Herdr does not get a
+  ctrl-click, so the widget reads the plain click and opens `http(s)` links.
 
 ## Development
 
 ```bash
-tests/run.sh    # all tests and the typecheck. CI runs this.
-```
-
-Or run the two parts:
-
-```bash
-bun test        # no network, no gh, no Herdr
-bunx tsc --noEmit
+tests/run.sh   # all tests and the typecheck, with no network. CI runs this.
 ```
 
 `tests/manifest.test.ts` compares the manifest with the code. A bad command path
-or link pattern fails in a hook at runtime, where you cannot see the error.
-
-A draft is open. It is still your work, so the widget shows it dim and does not
-remove it.
+or link pattern otherwise fails in a hook at runtime, where you cannot see the
+error.
